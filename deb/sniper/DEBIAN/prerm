@@ -1,0 +1,19 @@
+#!/bin/bash
+
+#停止服务
+/sbin/sniper --uninstall ZH94f2J1cH19Tnx0
+running=`ps -eaf | grep /sbin/sniper | grep -v grep`
+if [ "$running" != "" ]
+then
+	echo "stop running sniper fail"
+	echo "$running"
+	exit 1
+fi
+
+plist=`ps -C snipertray -o pid=`
+if [ "$plist" != "" ]
+then
+        echo "$plist" | xargs kill -9
+fi
+
+exit 0

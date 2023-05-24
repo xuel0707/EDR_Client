@@ -1,0 +1,25 @@
+1、准备本地打包环境
+   sh prepare.sh 安装包名
+   如，sh prepare.sh ngep-linux-5.0.4.211201
+
+2、将源码包打包拷贝到麒麟v10服务器系统上，如192.167.7.20
+
+3、在麒麟v10服务器系统上
+1) 解开源码包，进入源码包目录，如/home/kylin/Linux
+2) sh oem/ngep-arm64/oem_ngep.sh
+3) bash mk-kylin-v10-server
+
+4、将dist2目录的内容拷贝到本地的/tmp/ngep-arm64/安装包名/KylinServer/目录下
+   如：scp -r kylin@192.167.7.20:/home/kylin/Linux/dist2/* /tmp/ngep-arm64/ngep-linux-5.0.4.211201/KylinServer/
+
+5、将源码包打包拷贝到麒麟v10桌面系统上，如192.167.7.19
+
+6、在麒麟v10桌面系统上
+1) 解开源码包，进入源码包目录，如/home/kylin/Linux
+2) sh oem/ngep-arm64/oem_ngep.sh
+4) bash mk-kylin-v10-desktop
+
+7、将dist2目录的内容拷贝到本地的/tmp/ngep-arm64/安装包名/KylinDesktop/目录下
+   如：scp -r kylin@192.167.7.19:/home/kylin/Linux/dist2/* /tmp/ngep-arm64/ngep-linux-5.0.4.211201/KylinDesktop/
+
+8、sh build.sh

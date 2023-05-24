@@ -1,0 +1,24 @@
+make clean
+make nokern RELEASE=1
+
+rm -rf dist2
+mkdir -p dist2/10
+cp -rf dist/* dist2/10/
+
+kver=("4.19.90-21.2.ky10.x86_64" \
+      "4.19.90-24.4.v2101.ky10.x86_64")
+
+short_kver=("4.19.90-21" \
+            "4.19.90-24") 
+
+for((i=0;i<=1;i++))
+do
+	echo
+	echo make ${kver[$i]} kernel module
+	mkdir dist2/${short_kver[$i]}
+	make kernel-clean
+	sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/kernels\/${kver[$i]}/g" kern/Makefile
+	echo "/usr/src/kernels/${kver[$i]}" > kern/kernel_header_dir
+	make kernel
+	cp kern/sniper_edr.ko dist2/${short_kver[$i]}/
+done

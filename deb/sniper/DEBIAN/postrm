@@ -1,0 +1,14 @@
+#!/bin/bash
+
+#如果覆盖安装，调用的脚本及顺序是prerm, preinst, postrm, postinst
+#此时postrm不可删除/opt/snipercli/，否则就删了新安装的程序
+if [ ! -f /tmp/sniper-installing ]
+then
+	#删除残留数据
+	rm -rf /opt/snipercli/
+fi
+
+sed -i "/sniper/d" /etc/rc.local 2>/dev/null
+sed -i "/sniper/d" /etc/rc.d/rc.local 2>/dev/null
+
+exit 0

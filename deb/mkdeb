@@ -1,0 +1,14 @@
+DIR="sniper"
+CONF="${DIR}/DEBIAN/control"
+
+package=`grep Package ${CONF} | awk '{print $2}'`
+version=`grep Version ${CONF} | awk '{print $2}'`
+arch=`grep Architecture ${CONF} | awk '{print $2}'`
+
+chmod +x ${DIR}/DEBIAN/postinst
+chmod +x ${DIR}/DEBIAN/postrm
+chmod +x ${DIR}/DEBIAN/preinst
+chmod +x ${DIR}/DEBIAN/prerm
+
+dpkg -b ${DIR} ${package}-${version}.${arch}.deb
+mv ${package}-${version}.${arch}.deb ..

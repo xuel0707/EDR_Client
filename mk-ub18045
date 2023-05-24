@@ -1,0 +1,20 @@
+make clean
+make nokern RELEASE=1
+
+rm -rf dist2
+mkdir -p dist2/18.04
+cp -rf dist/* dist2/18.04/
+
+kver_list="4.15.0-122" 
+
+for kver in ${kver_list}
+do
+	echo
+	echo make $kver kernel module
+	mkdir dist2/$kver
+	make kernel-clean
+	sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/linux-headers-${kver}-generic/g" kern/Makefile
+	echo "/usr/src/linux-headers-${kver}-generic" > kern/kernel_header_dir
+	make kernel
+	cp kern/sniper_edr.ko dist2/$kver/
+done

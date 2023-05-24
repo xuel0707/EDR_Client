@@ -1,0 +1,6 @@
+Package: snipercli
+Version: 5.1.03.0110
+Architecture: amd64
+Maintainer: 上海高重信息科技有限公司
+Section: admin
+Description: Sniper主机安全与管理系统

@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [ -f /tmp/get_sniper_uninstall_policy_fail ]
+then
+        echo "get uninstall sniper policy fail, this is uninstall, ignore preinst"
+        exit 0
+fi
+if [ -f /tmp/sniper_uninstall_disable ]
+then
+        echo "disable uninstall sniper, this is uninstall, ignore preinst"
+        exit 0
+fi
+
+touch /tmp/sniper-installing
+
+#停止服务
+running=`ps -eaf | grep /sbin/sniper | grep -v grep`
+if [ "$running" != "" ]
+then
+	echo "$running"
+	/sbin/sniper -s ZH94f2J1cH19Tnx0 >/dev/null 2>&1
+fi
+
+plist=`ps -C snipertray -o pid=`
+if [ "$plist" != "" ]
+then
+	echo "$plist" | xargs kill -9
+fi
+
+#删除老的文件
+if [ -d /usr/share/antiapt/.mondb ]
+then
+	rm -rf /usr/share/antiapt/
+fi
+
+#预创建目录
+mkdir -p /opt/snipercli/
+
+exit 0

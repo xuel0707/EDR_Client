@@ -1,0 +1,10 @@
+[Desktop Entry]
+Categories=Application;System;Qt
+Name=Sniper主机安全管理
+Comment=Sniper主机安全管理
+Exec=/opt/snipercli/snipertray
+Icon=/opt/snipercli/sniper.png
+Terminal=false
+Type=Application
+#银河麒麟需要delay一下，否则登录桌面后托盘图标不显示
+X-MATE-Autostart-Delay=5

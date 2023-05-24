@@ -1,0 +1,67 @@
+01/04/2022 15:43:46 libsavapi[3434]: [ID140567073625920] INFO: Console input: ./lib_file_scan_example 1234 /tmp/file.df
+01/04/2022 15:43:46 libsavapi[3434]: [ID140567073625920] INFO: SAVAPI example compiled with API version 5.5
+01/04/2022 15:43:46 libsavapi[3434]: [ID140567073625920] INFO: Initializing SAVAPI library
+01/04/2022 15:43:46 libsavapi[3434]: [ID140567073625920] DEBUG: Checking engine core file 'aecore.so' (file exists, has read access, is a regular file and has AVIRA signature)
+01/04/2022 15:43:46 libsavapi[3434]: [ID140567073625920] DEBUG: Checking file '/home/ryc/tools/xiaohongsan/savapi-sdk-linux64/bin/aecore.so'
+01/04/2022 15:43:46 libsavapi[3434]: [ID140567073625920] DEBUG: Loading engine file 'aecore.so' and API
+01/04/2022 15:43:46 libsavapi[3434]: [ID140567073625920] INFO: Initializing engine
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Retrieving engine's extension list
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Retrieving engine's VDF black-list
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Retrieving engine's global FOPS
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Checking last VDF info
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Retrieving engine version
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Retrieving AVPACK version
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Retrieving supported containers list (archives, mails, mail-boxes)
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Retrieving VDF version
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Checking VDF age
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] WARNING: The VDF file is more than 14 days old
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Engine initialized (AVE: 8.3.64.88, VDF: 8.19.6.170, AVPACK: 8.5.2.32)
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: SAVAPI library initialized
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: No proxy found. Using direct connection.
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Initializing FPC
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Reading random id from file failed. File cannot be accessed or the random id is invalid. Random id will be calculated for this session
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: FPC initialized
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Initializing APC library
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: No proxy found. Using direct connection.
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Reading random id from file failed. File cannot be accessed or the random id is invalid. Random id will be calculated for this session
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: [APC]No proxy found. Using direct connection.
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: APC library initialized
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Creating SAVAPI instance
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Using engine version 8.3.64.88
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Creating engine instance
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Configuring the engine instance
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Initializing malware type detection
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Engine instance created
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Creating FPC instance
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: [FPC]No proxy found. Using direct connection.
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: FPC instance created
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Checking license
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] WARNING: Failed to check product ID '1234' with error code '66': Operation not allowed (license restriction)
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: SAVAPI instance created
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_set_user_data was called
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_set_user_data was successful
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_with_encoding_get for option 'AVE_VERSION' was called
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_with_encoding_get for option 'AVE_VERSION' was successful: value '8.3.64.88'
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_with_encoding_get for option 'VDF' was called
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_with_encoding_get for option 'VDF' was successful: value '8.19.6.170'
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_with_encoding_get for option 'EXPIRE' was called
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_with_encoding_get for option 'EXPIRE' was successful: value '0'
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_with_encoding_get for option 'VDF_SIGCOUNT' was called
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_with_encoding_get for option 'VDF_SIGCOUNT' was successful: value '6780387'
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: SAVAPI_set for option 'PRODUCT' with value '1234' was called
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] ERROR: SAVAPI_set for option 'PRODUCT', value '1234', failed with error code '66': Operation not allowed (license restriction)
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Destroying FPC instance
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: FPC instance destroyed
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Destroying engine instance
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Engine instance destroyed
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Unloading APC library
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Checking if all instances are destroyed
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: APC library unloaded
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Unloading FPC
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: FPC unloaded
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Unloading SAVAPI library
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Checking if all instances are destroyed
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Unloading engine 8.3.64.88
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] DEBUG: Unloading engine library
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: Engine 8.3.64.88 unloaded
+01/04/2022 15:43:52 libsavapi[3434]: [ID140567073625920] INFO: SAVAPI library unloaded

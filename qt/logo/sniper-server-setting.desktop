@@ -1,0 +1,11 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Sniper管控中心配置
+GenericName=Sniper管控中心配置
+Comment=Sniper管控中心配置
+Exec=/opt/snipercli/sniper_servaddr
+Icon=/opt/snipercli/sniper.png
+Terminal=false
+Type=Application
+StartupNotify=True
+Categories=System

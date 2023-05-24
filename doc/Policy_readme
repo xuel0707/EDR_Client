@@ -1,0 +1,310 @@
+策略分成由3个全局结构体变量组成，protect_policy_global(防护策略),fasten_policy_global(加固策略),other_policy_global(其他配置策略)
+数据结构的定义在user/policy.h中
+开关，阻断，锁定的值与旧策略不通
+新的值：
+	1、启用，0、不启用
+	1、阻断，0、不阻断
+	1、锁定，0、不锁定
+新的宏：
+	#define TURN_MY_OFF 0
+	#define TURN_MY_ON  1
+
+读写锁
+	protect_policy_global.lock
+	fasten_policy_global.lock
+	other_policy_global.lock
+
+防护策略
+	恶意行为防护
+		挖矿行为
+			开关：protect_policy_global.behaviour.pool.enable
+			阻断：protect_policy_global.behaviour.pool.terminate
+			锁定ip开关:protect_policy_global.behaviour.pool.locking
+			锁定时长(分钟):protect_policy_global.behaviour.pool.locking_time
+		勒索行为
+			追踪防护引擎
+				开关：protect_policy_global.behaviour.ransomware.track.enable
+				阻断：protect_policy_global.behaviour.ransomware.track.terminate
+			加密防护引擎
+				开关：protect_policy_global.behaviour.ransomware.encrypt.enable
+				阻断：protect_policy_global.behaviour.ransomware.encrypt.terminate
+				windows文档类型个数：protect_policy_global.behaviour.ransomware.encrypt.ext_num
+				windows文档类型：protect_policy_global.behaviour.ransomware.encrypt.ext[i].list
+				linux文档类型：protect_policy_global.behaviour.ransomware.encrypt.my_linux.ext
+				隐藏诱捕文件开关：protect_policy_global.behaviour.ransomware.encrypt.hide
+				文档备份
+					开关：protect_policy_global.behaviour.ransomware.encrypt.backup.enable
+					改动大于(分钟)的文件不备份：protect_policy_global.behaviour.ransomware.encrypt.backup.neglect_min
+					大于(MB)文件不备份:protect_policy_global.behaviour.ransomware.encrypt.backup.neglect_size
+					备份保留空间(GB):protect_policy_global.behaviour.ransomware.encrypt.backup.backup_size
+	进程异常防护
+		反弹shell
+			开关：protect_policy_global.process.reverse_shell.enable
+			阻断：protect_policy_global.process.reverse_shell.terminate
+			锁定ip开关:protect_policy_global.process.reverse_shell.locking
+			锁定时长(分钟):protect_policy_global.process.reverse_shell.locking_time
+		非法提权
+			开关：protect_policy_global.process.privilege.enable
+			阻断：protect_policy_global.process.privilege.terminate
+		MBR防护
+			开关：protect_policy_global.process.mbr.enable
+			阻断：protect_policy_global.process.mbr.terminate
+		可疑命令执行
+			开关：protect_policy_global.process.dangerous_command.enable
+			阻断：protect_policy_global.process.dangerous_command.terminate
+		中国菜刀命令执行
+			开关：protect_policy_global.process.webshell.enable
+			阻断：protect_policy_global.process.webshell.terminate
+		对外服务进程异常执行
+			开关：protect_policy_global.process.service_process.enable
+			阻断：protect_policy_global.process.service_process.terminate
+		伪造系统进程运行
+			开关：protect_policy_global.process.fake_sys_process.enable
+			阻断：protect_policy_global.process.fake_sys_process.terminate
+		隧道搭建
+			开关：protect_policy_global.process.tunnel.enable
+			阻断：protect_policy_global.process.tunnel.terminate
+		危险命令
+			开关：protect_policy_global.process.risk_command.enable
+			阻断：protect_policy_global.process.risk_command.terminate
+		异常进程
+			开关：protect_policy_global.process.abnormal_process.enable
+			阻断：protect_policy_global.process.abnormal_process.terminate
+		命令列表
+			命令列表数量: protect_policy_global.process.command_num
+			命令：protect_policy_global.process.command_table_list[i].list
+	异常网络防护
+		访问恶意域名
+			开关：protect_policy_global.network.domain.enable
+			阻断：protect_policy_global.network.domain.terminate
+		非法连接互联网
+			开关：protect_policy_global.network.illegal_connect.enable
+			阻断：protect_policy_global.network.illegal_connect.terminate
+			探测地址数量：protect_policy_global.network.illegal_connect.addr_num
+			探测地址:protect_policy_global.network.illegal_connect.address[i].list
+			连接间隔(分钟):protect_policy_global.network.illegal_connect.interval
+		端口扫描防护
+			开关：protect_policy_global.network.port.enable
+			阻断：protect_policy_global.network.port.terminate
+			单个IP请求访问时间范围(秒)内：protect_policy_global.network.port.request_period
+			最大扫描端口数量(个):protect_policy_global.network.port.count
+			恶意探测IP锁定时间(分钟):protect_policy_global.network.port.locking_time
+/*弃用*/
+/*
+			敏感端口扫描保护
+				开关：protect_policy_global.network.port.sensitive.enable
+				端口数量：protect_policy_global.network.port.sensitive.list_num
+				端口：protect_policy_global.network.port.sensitive.list[i].port
+*/
+		端口诱捕
+			开关:protect_policy_global.network.sensitive_port.enable
+			锁定ip:protect_policy_global.network.sensitive_port.terminate
+			IP锁定时间(分钟):protect_policy_global.network.sensitive_port.locking_time
+			端口数量:protect_policy_global.network.sensitive_port.list_num
+			端口:protect_policy_global.network.sensitive_port.list[i].port
+
+		登录监控
+			开关：protect_policy_global.network.login.enable
+			本地用户登录
+				开关：protect_policy_global.network.login.local_enable
+			远程用户登录
+				开关：protect_policy_global.network.login.remote_enable
+	系统账号防护
+		异常登录
+			开关：protect_policy_global.account.login.enable
+			本地用户登录监控
+				开关：protect_policy_global.account.login.local.enable
+				阻断：protect_policy_global.account.login.local.terminate
+				阻断模式：protect_policy_global.account.login.local.terminate_mode
+				常用登录时间设置
+					开关：protect_policy_global.account.login.local.time.enable
+					登录时间数量：protect_policy_global.account.login.local.time.list_num
+					开始时间：protect_policy_global.account.login.local.time.list[i].start_time
+					结束时间：protect_policy_global.account.login.local.time.list[i].end_time
+			远程登录监控
+				开关：protect_policy_global.account.login.remote.enable
+				阻断: protect_policy_global.account.login.remote.terminate
+				阻断模式: protect_policy_global.account.login.remote.terminate_mode
+				常用登录时间设置
+					开关：protect_policy_global.account.login.remote.time.enable
+					登录时间数量：protect_policy_global.account.login.remote.time.list_num
+					开始时间：protect_policy_global.account.login.remote.time.list[i].start_time
+					结束时间：protect_policy_global.account.login.remote.time.list[i].end_time
+				常用登录地点设置
+					开关：protect_policy_global.account.login.remote.location.enable
+					地点时间数量：protect_policy_global.account.login.remote.location.list_num
+					开始时间：protect_policy_global.account.login.remote.time.list[i].city
+					结束时间：protect_policy_global.account.login.remote.time.list[i].province
+			暴力密码破解防护
+				开关：protect_policy_global.account.login.crack.enable
+				登录分钟：protect_policy_global.account.login.crack.interval
+				登录次数：protect_policy_global.account.login.crack.limit
+				锁定ip：protect_policy_global.account.login.crack.terminate
+				锁定分钟：protect_policy_global.account.login.crack.locking_time
+		异常账号
+			开关：protect_policy_global.account.abnormal_user.enable
+		用户变更监控
+			开关：protect_policy_global.account.user_change.enable
+			用户组变更：protect_policy_global.account.user_change.group.enable
+			用户变更：protect_policy_global.account.user_change.user.enable
+	敏感信息防护
+		敏感文件
+			开关：protect_policy_global.sensitive_info.sensitive_file.enable
+			阻断：protect_policy_global.sensitive_info.sensitive_file.terminate
+			文件列表
+				文件列表数量: protect_policy_global.sensitive_info.sensitive_file.list_num
+				文件：protect_policy_global.sensitive_info.sensitive_file.list[i].list
+		日志异常删除
+			开关：protect_policy_global.sensitive_info.log_delete.enable
+			文件列表
+				文件列表数量: protect_policy_global.sensitive_info.log_delete.list_num
+				文件：protect_policy_global.sensitive_info.log_delete.list[i].list
+		文件防篡改
+			开关：protect_policy_global.sensitive_info.file_safe.enable
+			文件数量：protect_policy_global.sensitive_info.file_safe.list_num
+				文件路径：protect_policy_global.sensitive_info.file_safe.list[i].path
+				文件链接路径：protect_policy_global.sensitive_info.file_safe.list[i].real_path
+				文件名：protect_policy_global.sensitive_info.file_safe.list[i].name
+				授权进程：protect_policy_global.sensitive_info.file_safe.list[i].process
+				检测动作：protect_policy_global.sensitive_info.file_safe.list[i].operation
+				阻断状态：protect_policy_global.sensitive_info.file_safe.list[i].status
+
+			锁定ip开关:protect_policy_global.process.reverse_shell.locking
+			锁定时长(分钟):protect_policy_global.process.reverse_shell.locking_time
+		usb文件
+			开关：protect_policy_global.sensitive_info.file_usb.enable
+			后缀名列表
+				后缀名列表数量: protect_policy_global.sensitive_info.file_usb.list_num
+				后缀名：protect_policy_global.sensitive_info.file_usb.list[i].list
+		中间件识别
+			开关: protect_policy_global.sensitive_info.middleware.enable
+			中间件：protect_policy_global.sensitive_info.middleware.target
+			可执行文件识别: protect_policy_global.sensitive_info.middleware.executable_files.enable
+				过滤文件：protect_policy_global.sensitive_info.middleware.executable_files.exclude
+				文件：protect_policy_global.sensitive_info.middleware.executable_files.ext
+				阻断：protect_policy_global.sensitive_info.middleware.executable_files.terminate
+			脚本文件识别: protect_policy_global.sensitive_info.middleware.script_files.enable
+				文件：protect_policy_global.sensitive_info.middleware.script_files.ext
+				阻断：protect_policy_global.sensitive_info.middleware.script_files.terminate
+		非法脚本识别
+			开关：protect_policy_global.sensitive_info.illegal_script.enable
+			监控路径数量：protect_policy_global.sensitive_info.illegal_script.target_num
+			监控路径：protect_policy_global.sensitive_info.illegal_script.target[i].path
+			文件链接路径：protect_policy_global.sensitive_info.illegal_script.target[i].real_path
+			文件类型: protect_policy_global.sensitive_info.illegal_script.target[i].extension
+			使用系统审查库:protect_policy_global.sensitive_info.illegal_script.use_default_keyword
+			审查库数量：protect_policy_global.sensitive_info.illegal_script.default_keyword_num
+			审查库: protect_policy_global.sensitive_info.illegal_script.default_keyword[i].list
+			关键字数量：protect_policy_global.sensitive_info.illegal_script.keyword_num
+			关键字: protect_policy_global.sensitive_info.illegal_script.keyword[i].list
+			阻断：protect_policy_global.sensitive_info.illegal_script.terminate
+/* 930版本 */
+		后门检测
+			开关:protect_policy_global.sensitive_info.backdoor.enable
+		非法脚本识别
+			开关：protect_policy_global.sensitive_info.webshell_detect.enable
+			监控路径数量：protect_policy_global.sensitive_info.webshell_detect.target_num
+			监控路径：protect_policy_global.sensitive_info.webshell_detect.target[i].path
+			文件链接路径：protect_policy_global.sensitive_info.webshell_detect.target[i].real_path
+			文件类型: protect_policy_global.sensitive_info.webshell_detect.target[i].extension
+			使用系统审查库:protect_policy_global.sensitive_info.webshell_detect.use_default_rule /* 这个变量没用到 */
+/* 21-0107版本 */
+			检测模式:protect_policy_global.sensitive_info.webshell_detect.detect_mode
+/* 21-0107版本 */
+			阻断：protect_policy_global.sensitive_info.webshell_detect.terminate
+/* 930版本 */
+	日志采集
+		进程行为采集
+			开关：protect_policy_global.logcollector.process_enable
+		文件行为采集
+			开关：protect_policy_global.logcollector.file_enable
+			文件列表
+				文件列表数量：protect_policy_global.logcollector.file_list_num
+				文件路径：protect_policy_global.logcollector.file_list[i].filepath
+				文件链接路径：protect_policy_global.logcollector.file_list[i].real_path
+				后缀：protect_policy_global.logcollector.file_list[i].extension
+		网络行为采集
+			开关：protect_policy_global.logcollector.network_enable
+		域名查询行为采集
+			开关：protect_policy_global.logcollector.dnsquery_enable
+
+加固策略
+	系统
+		负载监控
+			开关：fasten_policy_global.system.load_enable
+			CPU使用率最高限制：fasten_policy_global.system.load_cpu
+			内存使用率最高限制:fasten_policy_global.system.load_memory
+			磁盘使用率最高限制:fasten_policy_global.system.load_disk
+	资源
+		系统负载监控
+			开关:fasten_policy_global.resource.sys.enable
+		CPU监控
+			开关:fasten_policy_global.resource.sys.cpu.enable
+			持续时间:fasten_policy_global.resource.sys.cpu.interval
+			超过百分比:fasten_policy_global.resource.sys.cpu.limit
+		内存监控
+			开关:fasten_policy_global.resource.sys.memory.enable
+			持续时间:fasten_policy_global.resource.sys.memory.interval
+			超过百分比:fasten_policy_global.resource.sys.memory.limit
+		磁盘监控
+			开关:fasten_policy_global.resource.sys.disk.enable
+			持续时间:fasten_policy_global.resource.sys.disk.interval
+			超过百分比:fasten_policy_global.resource.sys.disk.limit
+		网卡监控
+			开关:fasten_policy_global.resource.sys.netflow.enable
+			持续时间:fasten_policy_global.resource.sys.netflow.interval
+			流入:fasten_policy_global.resource.sys.netflow.up
+			流出:fasten_policy_global.resource.sys.netflow.down
+		进程负载监控
+		开关：fasten_policy_global.resource.process.enable
+		CPU监控
+			开关:fasten_policy_global.resource.process.cpu.enable
+			持续时间:fasten_policy_global.resource.process.cpu.interval
+			超过百分比:fasten_policy_global.resource.process.cpu.limit
+		内存监控
+			开关:fasten_policy_global.resource.process.memory.enable
+			持续时间:fasten_policy_global.resource.process.memory.interval
+			超过百分比:fasten_policy_global.resource.process.memory.limit
+	设备
+		USB存储接入
+			开关：fasten_policy_global.device.usb.enable
+			阻断：fasten_policy_global.device.usb.terminate
+			例外USB数量:fasten_policy_global.device.usb.exclude_num
+			例外USB:fasten_policy_global.device.usb.exclude[i].list
+		打印机监控
+			开关：fasten_policy_global.device.printer.enable
+			阻断：fasten_policy_global.device.printer.terminate
+			监控打印类型数量:fasten_policy_global.device.printer.ext_num
+			监控打印类型:fasten_policy_global.device.printer.ext[i].list
+		刻录机监控
+			开关：fasten_policy_global.device.cdrom.enable
+			阻断：fasten_policy_global.device.cdrom.terminate
+			监控打印类型数量:fasten_policy_global.device.cdrom.ext_num
+			监控打印类型:fasten_policy_global.device.cdrom.ext[i].list
+		例外主机
+			例外主机数量：fasten_policy_global.device.exclude_num
+			例外主机UUID：fasten_policy_global.device.exclude_uuid[i].list
+病毒防护策略
+	病毒检测
+		实时检测 antivirus_policy_global.real_time_check.enable
+		扫描查杀 antivirus_policy_global.scanning_kill.enable
+			定时扫描 antivirus_policy_global.scanning_kill.cron.enable
+			扫描方式 antivirus_policy_global.scanning_kill.cron.scanning_way
+			扫描周期 antivirus_policy_global.scanning_kill.cron.time_type
+			选择时间 antivirus_policy_global.scanning_kill.cron.day;antivirus_policy.scanning_kill.cron.time
+	病毒查杀配置
+		处理方式 antivirus_policy_global.automate
+		隔离区设置: antivirus_policy_global.reserved_space 隔离区所在磁盘保留空间[]GB
+		例外设置：antivirus_policy_global.neglect_size 忽略大于[]MB文件
+		信任区数量 antivirus_policy_global.list_num
+		信任区：antivirus_policy_global.trust_list
+其他配置策略
+	是否允许卸载客户端
+		开关：other_policy_global.allow_uninstall.enable
+	是否显示客户端界面
+		开关：other_policy_global.allow_ui_tray.enable
+
+
+策略id:policy_id_cur
+策略名称:policy_name_cur
+策略时间:policy_time_cur

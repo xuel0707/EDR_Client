@@ -1,0 +1,8 @@
+*.a
+*.o
+*.cmd
+dist/
+*.ko
+.vscode/
+user/apt_antivirus
+user/deobfuscation

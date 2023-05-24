@@ -1,0 +1,30 @@
+make clean
+make nokern $1
+
+mkdir -p dist2/5
+cp -rf dist/* dist2/5/
+
+kver=("2.6.18-8.el5-x86_64" \
+      "2.6.18-53.el5-x86_64" \
+      "2.6.18-92.el5-x86_64" \
+      "2.6.18-128.el5-x86_64" \
+      "2.6.18-164.el5-x86_64" \
+      "2.6.18-194.el5-x86_64" \
+      "2.6.18-238.el5-x86_64" \
+      "2.6.18-274.el5-x86_64" \
+      "2.6.18-308.el5-x86_64" \
+      "2.6.18-348.el5-x86_64" \
+      "2.6.18-371.el5-x86_64" \
+      "2.6.18-398.el5-x86_64")
+
+for((i=0;i<=11;i++))
+do
+	echo
+	echo make 5.$i kernel module
+	mkdir dist2/5.$i
+	make kernel-clean
+	sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/kernels\/${kver[$i]}/g" kern/Makefile
+	echo "/usr/src/kernels/${kver[$i]}" > kern/kernel_header_dir
+	make kernel
+	cp kern/sniper_edr.ko dist2/5.$i/
+done

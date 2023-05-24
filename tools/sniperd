@@ -1,0 +1,134 @@
+#!/bin/bash
+#
+# sniper:	GH Sniper
+#
+# chkconfig: - 09 91
+# description: GH Sniper Linux Agent
+#
+### BEGIN INIT INFO
+# Provides: gh_sniper
+# Required-Start: $syslog $network
+# Required-Stop: $syslog $network 
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Description:  GH Sniper Linux Agent
+### END INIT INFO
+
+GH_BIN_NAME=sniper
+GH_INSTALL_DIR=/opt/snipercli
+GH_LOGS_FILE=/var/log/antiapt.log
+
+
+PS="/bin/ps -ef"
+GREP="/bin/grep"
+WC="/usr/bin/wc -l"
+CAT="/bin/cat"
+RM="/bin/rm"
+SED="/bin/sed"
+AWK="/usr/bin/awk"
+CUT="/usr/bin/cut"
+CHMOD="/bin/chmod"
+SYSTEMCTL="/bin/systemctl"
+
+if [ -f /etc/debian_version ]; then
+    SERVICE="/usr/sbin/service"
+    CRON="cron"
+else
+    SERVICE="/sbin/service"
+    CRON="crond"
+fi
+
+pidfile=/var/run/antiapt.pid 
+
+running () {
+    [ -e $pidfile ] &&
+        [ "$(readlink "/proc/$(<$pidfile)/exe")" = "/sbin/sniper" ]
+}
+
+start() {
+
+    if running; then
+	echo Already started
+	return 1
+    fi
+
+    echo "Starting Sniper"
+
+    /sbin/sniper >/dev/null 2>&1 &
+
+     return 0
+}
+
+stop() {
+
+    if [ $# -gt 1 ]; then 
+	SKey=$2
+    else
+	echo "Stop Sniper Need Input Stop_Key..."
+	return 0
+    fi
+
+    printf "Shutting Down sniper"
+
+    if [ -f /sbin/sniper ]; then
+	/sbin/sniper -s $SKey
+    fi
+
+    sleep 5
+
+    pkill -f /sbin/sniper
+    pkill -0 -f /sbin/sniper
+    local exit_code=$?
+    while [ $exit_code -eq 0 ]; do
+            sleep 1
+            pkill -0 -f /sbin/sniper
+            exit_code=$?
+            printf "."
+    done
+
+    rmmod sniper_edr
+
+    ${RM} /var/run/antiapt.pid > /dev/null 2>&1
+    echo
+    return 0 
+}
+
+status() {
+
+    sniper_pid=`${PS} | ${GREP} /sbin/sniper | ${GREP} -v grep | ${WC}` 
+    if [ ${sniper_pid} -ge 1 ] ; then 
+        echo "sniper is running"
+    elif [ ${sniper_pid} -eq 0 ] ; then
+        echo "sniper is stopped"
+        return 1
+    else
+        echo "sniper is in unknown state. Try restarting"
+        return 2      
+    fi
+}
+
+restart() {
+    stop $*
+    start
+}
+
+case "$1" in
+    start)
+	start
+	;;
+    stop)
+	stop $*
+	;;
+    status)
+        status
+        ;;
+    restart)
+	restart
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+
+exit $?

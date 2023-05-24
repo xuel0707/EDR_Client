@@ -1,0 +1,83 @@
+#!/bin/bash
+
+LOG="/var/log/sniper-install.log"
+
+echo "`date` : $0 $*" >> $LOG
+
+myid=`id -u`
+if [ "$myid" != "0" ]
+then
+	echo "Permission denied. Only root can install/uninstall sniper" 
+	echo "Permission denied. Only root can install/uninstall sniper" >> $LOG
+	exit 1
+fi
+
+run=`ps -o pid,cmd | grep "sniper-linux-.*bin" | grep -v grep`
+num=`echo $run | wc -l`
+if [ $num -gt 1 ]
+then
+	echo "Another sniper install program running:"
+	echo "$run"
+	echo "Another sniper install program running" >> $LOG
+	echo "$run" >> $LOG
+	exit 1
+fi
+
+verprefix=`echo "SNIPERVER" | cut -f1-2 -d"-"`
+if [ "$verprefix" != "sniper-linux" ]
+then
+	echo "Bad Sniper version: SNIPERVER"
+	echo "Bad Sniper version: SNIPERVER" >> $LOG
+	exit 1
+fi
+
+echo "Self-extracting 1 ..."
+result=`dd if=$0 of=/opt/SNIPERVER.tar.gz bs=4096 skip=1 2>&1`
+if [ ! -f /opt/SNIPERVER.tar.gz ]
+then
+	echo "Self-extracting 1 fail"
+	echo "$result"
+	echo "Self-extracting 1 fail" >> $LOG
+	echo "$result" >> $LOG
+	exit 1
+fi
+
+# 获取installtoken
+size=`stat -c "%s" /opt/SNIPERVER.tar.gz`
+off=`expr $size - 44`
+dd if=/opt/SNIPERVER.tar.gz of=/tmp/sniper-installtoken bs=1 skip=$off >/dev/null 2>&1
+token=`grep installtoken /tmp/sniper-installtoken 2>/dev/null`
+if [ "$token" != "" ]
+then
+	# 产生/etc/sniper-installtoken
+	mv /tmp/sniper-installtoken /etc/sniper-installtoken
+	# 把SNIPERVER.tar.gz尾部的installtoken截掉
+	truncate -s $off /opt/SNIPERVER.tar.gz
+fi
+
+# 如果安装命令带了installtoken参数，用这个参数
+if [ $# -eq 2  -a "$1" != "unit" ]
+then
+	echo "$2installtoken" > /etc/sniper-installtoken
+fi
+
+echo "Self-extracting 2 ..."
+cd /opt
+tar -m -zxf SNIPERVER.tar.gz
+rm -f SNIPERVER.tar.gz
+if [ ! -f /opt/SNIPERVER/install.sh ]
+then
+	echo "Self-extracting 2 fail"
+	echo "Self-extracting 2 fail" >> $LOG
+	exit 1
+fi
+
+cd SNIPERVER
+echo "`pwd` : install.sh $*" >> $LOG
+./install.sh $*
+ret=$?
+
+cd ..
+rm -rf SNIPERVER
+
+exit $ret

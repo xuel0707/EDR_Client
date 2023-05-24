@@ -1,0 +1,22 @@
+make clean
+
+mkdir -p dist2
+
+kver=("" \
+      "" \
+      "" \
+      "4.1.12-94.3.9.el7uek.x86_64")
+
+#oracle linux从7.13开始
+for((i=3;i<=3;i++))
+do
+	echo
+	echo make 7.1$i kernel module
+	mkdir dist2/7.1$i
+	make kernel-clean
+	sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/kernels\/${kver[$i]}/g" kern/Makefile
+	echo "/usr/src/kernels/${kver[$i]}" > kern/kernel_header_dir
+	make kernel
+	cp kern/sniper_edr.ko dist2/7.1$i/
+	/usr/src/kernels/${kver[$i]}/scripts/sign-file sha256 cert/x509.priv cert/x509.der kern/sniper_edr.ko dist2/7.1$i/sniper_edr.sign.ko
+done

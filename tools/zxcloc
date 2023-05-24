@@ -1,0 +1,192 @@
+#!/bin/bash
+#
+# 2021/12/13 zhengxiang
+#
+#统计文件的空行、注释行、代码行
+# 代码行数=总行数-空行-纯注释行
+# 注释比率=注释行数/非空行数
+#
+#对于.c，.cpp，.h文件，以下是建议的注释行格式
+#1. /* ...... */   一行注释
+#2. /* ......      两行注释
+#      ...... */
+#3. /*             多行注释。/*和*/视为空行，* ......视为注释行
+#    * ......
+#    * ......
+#    * ......
+#    */
+#4. xxxx /* ...... */  一行注释
+#5. xxxx // ......     一行注释
+#
+# 对于//只统计xxxx // ......的形式，因为// ......可能是注释，也可能是被屏蔽的代码
+
+
+if [ "$1" = "" ]; then
+	echo "Usage: sh zxcloc TARGET1 [TARGET2 ...]"
+	echo "       TARGET可以是文件，可以是目录，可以是通配符*，可以是带通配符的文件或目录"
+	exit
+fi
+
+FLAG=".zxcloc.$$"
+ARGSLIST="/tmp/$FLAG.args"
+FILELIST="/tmp/$FLAG.list"
+>$FILELIST
+
+#获取要统计的文件列表
+ls -d $* > $ARGSLIST  #将输入参数展开，并存入参数文件
+while [ 1 ]
+do
+	read target   #从参数文件中读取每一个参数
+	if [ "$target" = "" ]; then
+		break #文件结束
+	fi
+
+	if [ -d "$target" ]; then
+		#获取目录下的文件列表，包括子目录，但排除.git目录
+		find "$target" -path ./.git -prune -o -type f >> $FILELIST
+	else
+		echo "$target" >> $FILELIST
+	fi
+done < $ARGSLIST
+
+file_count=`wc -l /tmp/$FLAG.list | awk '{print $1}'`
+if [ $file_count -eq 0 ]; then
+	exit #没有要统计的文件
+fi
+
+#输出格式
+printf "Total\tBlank\tComment\tCode\tPercent\tFile\n"
+
+#处于兼容性考虑，不使用echo "Total\tBlank\tComment\tCode\tPercent\tFile"
+# bash -c "echo 'Total\tBlank\tComment\tCode\tPercent\tFile'"的结果是
+# Total\tBlank\tComment\tCode\tPercent\tFile
+#
+# sh -c "echo 'Total\tBlank\tComment\tCode\tPercent\tFile'"的结果是
+# Total   Blank   Comment Code    Percent File
+
+#解析文件的行信息
+count_lines()
+{
+	#只处理文本文件
+	text_type=`file "$1" | grep -i text`
+	if [ "$text_type" = "" ]; then
+		return
+	fi
+
+	filename=`basename "$1"`
+	LFILE="/tmp/$FLAG.$filename.left"
+	RFILE="/tmp/$FLAG.$filename.right"
+	LRFILE="/tmp/$FLAG.$filename"
+
+	#忽略引用sqlite3.c和sqlite3.h
+	if [ "$filename" = "sqlite3.h" -o "$filename" = "sqlite3.c" ]; then
+		return
+	fi
+
+	#总行数
+	total=`wc -l "$1" | awk '{print $1}'`
+
+	#统计空行
+	blank_count=`grep -c "^[ \t]*$" "$1"`
+
+	#处理源码文件
+	ext=`echo $1 | sed "s/.*\.//g"`
+	if [ "$ext" = "c" -o "$ext" = "cpp" -o "$ext" = "h" ]; then
+		#统计所有/* */的注释行
+		grep -n "\/\*" "$1" | cut -f1 -d: > $LFILE   #取/*行的行号
+		grep -n "\*\/" "$1" | cut -f1 -d: > $RFILE   #取*/行的行号
+		ln=`wc -l $LFILE | awk '{print $1}'`         #统计/*行的数量
+		rn=`wc -l $RFILE | awk '{print $1}'`         #统计*/行的数量
+		if [ $ln -ne $rn ]; then
+			rm -f $LFILE $RFILE $LRFILE          #删除临时文件
+
+			ERRFILE="/tmp/.zxcloc.$filename.err"
+			grep -n -E "\/\*|\*\/" "$1" | grep -v "\/\*.*\*\/" > $ERRFILE
+			echo "错误：$1 注释符/*和*/不匹配。详见$ERRFILE"   #/*和*/的数量应相等
+			return
+		fi
+
+		paste $LFILE $RFILE > $LRFILE  #把/*行的行号，和*/行的行号，合并到一个文件里
+
+		#统计1~4类的注释行
+		comment1234_count=0
+		while [ 1 ]
+		do
+			read start end #从注释行号文件中读取每一个配对的/*的行号，和*/的行号
+			if [ "$start" = "" ]; then
+				break  #文件结束
+			fi
+
+			#注释占用的行 = */行 - /*行 + 1，*/和/*同一行，算占一行
+			count=`expr $end - $start + 1`
+			comment1234_count=`expr $comment1234_count + $count`
+		done < $LRFILE
+
+		#统计第4类xxxx /* ...... */形式的注释行
+		comment4_count=`grep -v "^[ \t]*\/\*.*\*\/" "$1" | grep -c "\/\*.*\*\/"`
+
+		#统计第5类xxxx // ......形式的注释行
+		comment5_count=`grep -v "^[ \t]*\/\/" "$1" | grep -c "\/\/"`
+
+		#统计纯/*和*/的注释行，计算总注释行数和注释比率时，排除掉它们
+		skip1_count=`grep -c "^[ \t]*\/\*[ \t]*$" "$1"`
+		skip2_count=`grep -c "^[ \t]*\*\/[ \t]*$" "$1"`
+
+		#总注释行数 = 1~5类的注释行数和
+		comment_count=`expr $comment1234_count + $comment5_count - $skip1_count - $skip2_count`
+
+		#代码行数 = 总行数 - 空白行 - 1~3类注释行
+		comment123_count=`expr $comment1234_count - $comment4_count`
+		code_count=`expr $total - $blank_count - $comment123_count`
+
+		#注释比率=注释行数/非空行数
+		nonblank_count=`expr $total - $blank_count - $skip2_count - $skip2_count`
+		percent=`echo "scale=2; $comment_count*100/$nonblank_count" | bc`
+
+		#输出结果
+		printf "$total\t$blank_count\t$comment_count\t$code_count\t$percent\t$1\n"
+
+		#删除临时文件
+		rm -f $LFILE $RFILE $LRFILE
+
+		return
+	fi
+
+	#忽略编译产生的中间文件
+	if [ "$ext" = "cmd" ]; then
+		return
+	fi
+
+	#处理脚本文件
+
+	#统计所有带#的注释行
+	comment_count=`grep -c "#" "$1"`
+
+	#统计xxxx # ......形式的注释行
+	comment2_count=`grep -v "^[ \t]*#" "$1" | grep -c "#"`
+
+	#代码行数 = 总行数 - 空白行 - 纯注释行
+	comment1_count=`expr $comment_count - $comment2_count`
+	code_count=`expr $total - $blank_count - $comment1_count`
+
+	#注释比率=注释行数/非空行数
+	nonblank_count=`expr $total - $blank_count`
+	percent=`echo "scale=2; $comment_count*100/$nonblank_count" | bc`
+	
+	#输出结果
+	printf "$total\t$blank_count\t$comment_count\t$code_count\t$percent\t$1\n"
+}
+
+#解析所有文件的行信息
+while [ 1 ]
+do
+	read filepath #读取每一个要统计的文件
+	if [ "$filepath" = "" ]; then
+		break #文件结束
+	fi
+
+	count_lines $filepath
+done < $FILELIST
+
+#清理所有临时文件
+rm -f /tmp/$FLAG*

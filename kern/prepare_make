@@ -1,0 +1,139 @@
+#!/bin/bash
+
+TARGET="sniper_custom.h"
+rm -f $TARGET
+
+# 用security.h头文件来确认内核编译环境的头文件目录
+get_kernel_header_dir()
+{
+	# centos类
+
+	# kernel_header_dir文件由多内核编译脚本mk-xxx产生
+	DIR=`cat kernel_header_dir 2>/dev/null` 
+	if [ -f "$DIR/include/linux/security.h" ]; then
+		return
+	fi
+
+	DIR="/lib/modules/`uname -r`/build"
+	if [ -f "$DIR/include/linux/security.h" ]; then
+		return
+	fi
+
+	DIR="/lib/modules/`uname -r`/source"
+	if [ -f "$DIR/include/linux/security.h" ]; then
+		return
+	fi
+
+	# ubuntu类
+
+	kernver=`uname -r | cut -f1-2 -d"-"`
+	DIR="/usr/src/linux-headers-$kernver-common"
+	if [ -f "$DIR/include/linux/security.h" ]; then
+		return
+	fi
+
+	echo "Error: no kernel header direcotry"
+	exit 1
+}
+get_kernel_header_dir
+
+
+echo "make netfilter_custom.c from netfilter.c"
+
+HEADERFILE="$DIR/include/linux/netfilter.h"
+if [ ! -f "$HEADERFILE" ]; then
+	echo "Error: no netfilter.h($HEADERFILE) found, build netfilter_custom.c fail"
+	exit 1
+fi
+
+# 获取nf_hookfn函数的参数
+ARGS=`grep -A 15 "typedef.*nf_hookfn" $HEADERFILE | grep -m 1 -B 15 ";" | tr '\n' '@' | sed "s/@/ZXNL/g" | sed "s/;.*$//g" | sed "s/.*nf_hookfn//g"`
+
+# 替换netfilter.c中的nf_hookfn函数参数
+sed "s/(NF_HOOKFN_ARGS)/${ARGS}/g" netfilter.c | sed "s/ZXNL/\n/g" > netfilter_custom.c
+echo "netfilter_custom.c ready"
+
+# 替换netfilter_ipv6.c中的nf_hookfn函数参数
+sed "s/(NF_HOOKFN_ARGS)/${ARGS}/g" netfilter_ipv6.c | sed "s/ZXNL/\n/g" > netfilter_custom_ipv6.c
+echo "netfilter_custom_ipv6.c ready"
+
+
+# 创建sniper_custom.h
+echo "#ifndef __SNIPER_CUSTOM_H_" > $TARGET
+echo "#define __SNIPER_CUSTOM_H_" >> $TARGET
+
+# 检查nf_hookfn的skb参数类型是struct sk_buff **还是struct sk_buff *
+echo "${ARGS}" | tr -d '[:space:]' | grep "\*\*skb" >/dev/null
+if [ $? -eq 0 ]; then
+        echo "#define SKB_PTR_PTR 1" >> $TARGET
+fi
+
+# 检查是否定义了skb_set_transport_header
+grep skb_set_transport_header $DIR/include/linux/skbuff.h >/dev/null
+if [ $? -eq 0 ]; then
+        echo "#define HAVE_SKB_SET_TRANSPORT_HEADER 1" >> $TARGET
+fi
+
+# 检查是否define了sk_v6_rcv_saddr
+grep sk_v6_rcv_saddr $DIR/include/net/sock.h >/dev/null
+if [ $? -eq 0 ]; then
+        echo "#define SK_V6_DADDR 1" >> $TARGET
+fi
+
+# 确定使用的mount_lock的形式
+define_mount_lock()
+{
+	if [ "$DIR" = "" ]; then
+		SYMBOLFILE="/proc/kallsyms"
+	else
+		SYMBOLFILE="$DIR/System.map"
+	fi
+
+	grep -w mount_lock $SYMBOLFILE >/dev/null 2>&1
+	if [ $? -eq 0 ]
+	then
+		echo "#define USE_MOUNT_LOCK 1" >> $TARGET
+		return
+	fi
+
+	grep -w vfsmount_lock $SYMBOLFILE >/dev/null 2>&1
+	if [ $? -eq 0 ]
+	then
+		echo "#define USE_VFSMOUNT_LOCK 1" >> $TARGET
+		return
+	fi
+
+	echo "#define USE_VFSMOUNT_LOCK_FUNC 1" >> $TARGET
+}
+define_mount_lock
+
+# 确定kernel_read/write最后一个参数的参数形式
+write_offpointer=`grep "extern ssize_t kernel_write(.*loff_t \*);" $DIR/include/linux/fs.h`
+if [ "$write_offpointer" != "" ]
+then
+	echo "#define KERNEL_WRITE_OFF_POINTER 1" >> $TARGET
+fi
+read_offpointer=`grep "extern ssize_t kernel_read(.*loff_t \*);" $DIR/include/linux/fs.h`
+if [ "$read_offpointer" != "" ]
+then
+	echo "#define KERNEL_READ_OFF_POINTER 1" >> $TARGET
+fi
+
+# 确定task_struct数据结构是否有cpus_mask项
+cpusmask=`grep cpus_mask $DIR/include/linux/sched.h`
+if [ "$cpusmask" != "" ]
+then
+	echo "#define USE_CPUSMASK 1" >> $TARGET
+fi
+
+# 通过typedef sniper_siginfo_t来自适应不同的内核siginfo数据结构
+ksiginfo=`grep task_kill $DIR/include/linux/security.h | grep kernel_siginfo`
+if [ "$ksiginfo" = "" ]; then
+	echo "typedef struct siginfo sniper_siginfo_t;" >> $TARGET
+else
+	echo "typedef struct kernel_siginfo sniper_siginfo_t;" >> $TARGET
+fi
+
+echo "#endif" >> $TARGET
+
+exit 0

@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [ -f /etc/cron.d/sniperUpdate ]
+then
+    echo "sniper is updating"
+    exit 0
+fi
+
+PS="/bin/ps -C assist_sniper -o cmd"
+GREP="/bin/grep"
+WC="/usr/bin/wc -l"
+COUNTFILE="/opt/snipercli/cron-assist-start-count"
+
+if [ -f $COUNTFILE ]; then
+    reset_times=`cat $COUNTFILE` >/dev/null 2>&1
+else 
+    reset_times=0
+fi
+
+assist_sniper_pid=`${PS} | ${GREP} /sbin/assist_sniper | ${WC}`
+
+if [ ${assist_sniper_pid} -ge 1 ] ; then
+    echo "assist_sniper is running"
+    exit 0
+fi
+
+if [ ${assist_sniper_pid} -eq 0 ] ; then
+    echo "assist_sniper stopped, start it"
+else
+    echo "assist_sniper in unknown state, start it"
+fi
+
+/sbin/assist_sniper >/dev/null 2>&1 &
+ 
+i=`expr ${reset_times} + 1`
+echo $i > $COUNTFILE

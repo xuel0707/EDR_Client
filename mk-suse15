@@ -1,0 +1,21 @@
+make clean
+make nokern $1
+
+ver=15
+mkdir -p dist2/$ver
+cp -rf dist/* dist2/$ver/
+
+kver=("" \
+      "4.12.14-195")
+
+for((i=1;i<=1;i++))
+do
+	echo
+	echo make $ver.$i kernel module
+	mkdir dist2/$ver.$i
+	make kernel-clean
+	sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/linux-${kver[$i]}-obj\/x86_64\/default/g" kern/Makefile
+	echo "/usr/src/linux-${kver[$i]}-obj/x86_64/default" > kern/kernel_header_dir
+	make kernel
+	cp kern/sniper_edr.ko dist2/$ver.$i/
+done

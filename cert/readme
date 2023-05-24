@@ -1,0 +1,23 @@
+一、用于签名的证书和私钥
+
+用下面的命令生成用于签名的证书文件x509.der和私钥文件x509.priv
+
+openssl req -new -nodes -utf8 -sha256 -days 36500 -batch -x509 -config x509.config -outform DER -out x509.der -keyout x509.priv
+
+-new 产生新证书
+-nodes 不对私钥文件加密
+-utf8 输入字符为utf8编码
+-sha256 签发的证书使用的哈希算法，应取内核CONFIG_MODULE_SIG_HASH的值
+-days 36500 自签名证书的有效期（天数）
+-batch 批处理，不交互，不询问任何信息
+-x509 产生自签名的x509证书
+-config x509.x509.genkey 证书配置文件。如果不指定则默认使用/etc/pki/tls/openssl.cnf中req段落的值
+-outform DER|PEM 证书编码格式，DER(二进制)或者PEM(ascii base64)
+-out x509.der 产生的证书文件
+-keyout x509.priv 产生的私钥文件
+
+注：重复执行openssl命令，产生的证书和私钥是不同的，因此，证书和私钥只产生一次，否则升级时要重新导入证书
+
+二、对内核模块签名
+
+/usr/src/kernels/$(uname -r)/scripts/sign-file sha256 x509.priv x509.der sniper_edr.ko sniper_edr.ko.signed

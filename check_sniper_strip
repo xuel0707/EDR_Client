@@ -1,0 +1,12 @@
+result=`file dist/sniper | grep ", stripped"`
+echo ""
+file dist/sniper
+echo ""
+if [ "$result" = "" ]
+then
+        echo "Warning:"
+        echo "         sniper NOT stripped! remember strip when release"
+else
+        echo "Good! sniper stripped, can release"
+fi
+echo ""

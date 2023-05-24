@@ -1,0 +1,21 @@
+make clean
+make nokern RELEASE=1
+
+rm -rf dist2
+mkdir -p dist2/10
+cp -rf dist/* dist2/10/
+
+kver=("linux-headers-5.4.18-27-generic" \
+      "linux-headers-5.4.18-35-generic") 
+
+for((i=0;i<=1;i++))
+do
+	echo
+	echo make 10.$i kernel module
+	mkdir dist2/10.$i
+	make kernel-clean
+	sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/${kver[$i]}/g" kern/Makefile
+	echo "/usr/src/${kver[$i]}" > kern/kernel_header_dir
+	make kernel
+	cp kern/sniper_edr.ko dist2/10.$i/
+done

@@ -1,0 +1,10 @@
+>lz_tmp.c
+
+NO_LZ=`cc -lz lz_tmp.c -o lz_tmp 2>&1 | grep "cannot find -lz" | wc -l`
+
+if [ $NO_LZ -ne 0 ]
+then
+        sed -i "s/ -lz / /g" user/Makefile external/hydra_9.2/Makefile
+fi
+
+rm -f lz_tmp.c lz_tmp

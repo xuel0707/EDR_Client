@@ -1,0 +1,101 @@
+doclean()
+{
+	if [ -f $1/Makefile ]
+	then
+		make -C $1 clean
+	fi
+}
+
+if [ "$1" = "clean" ]
+then
+	doclean tray
+	doclean showlog
+	doclean strategy
+	doclean status
+	doclean docrestore
+	doclean hostinfo
+	doclean uninstall
+	doclean force_uninstall
+	doclean servaddr
+	rm -f       tray/snipertray              tray/Makefile
+	rm -f    showlog/sniper_showlog       showlog/Makefile
+	rm -f   strategy/sniper_strategy     strategy/Makefile
+	rm -f     status/sniper_status         status/Makefile
+	rm -f docrestore/sniper_docrestore docrestore/Makefile
+	rm -f   hostinfo/sniper_hostinfo     hostinfo/Makefile
+	rm -f  uninstall/sniper_uninstall   uninstall/Makefile
+	rm -f  force_uninstall/sniper_force_uninstall   force_uninstall/Makefile
+	rm -f   servaddr/sniper_servaddr     servaddr/Makefile
+	rm -rf dist/
+	exit
+fi
+
+if [ ! -d $1 ]
+then
+	echo Error: no $1
+	exit
+fi
+
+cd $1
+
+QT4=`qmake-qt4 -v 2>/dev/null`
+if [ "$QT4" != "" ]
+then
+	if [ "$1" = "showlog" ]
+	then
+		sed -i "s/setSectionResizeMode/setResizeMode/g" showlog.cpp
+	fi
+        qmake-qt4
+	make
+	echo
+	exit
+fi
+
+QT5=`qmake-qt5 -v 2>/dev/null`
+if [ "$QT5" != "" ]
+then
+        if [ "$1" = "showlog" ]
+        then
+                sed -i "s/setResizeMode/setSectionResizeMode/g" showlog.cpp
+        fi
+	if [ "$1" = "docrestore" ]
+	then
+		QMAKE_CFLAGS=`grep QMAKE_CFLAGS docrestore.pro`
+		if [ "$QMAKE_CFLAGS" = "" ]
+		then
+			echo "QMAKE_CFLAGS += -Wno-cast-function-type -Wno-implicit-fallthrough" >> docrestore.pro
+		fi
+	fi
+        qmake-qt5
+	make
+	echo
+	exit
+fi
+
+QT4=`qmake -v 2>/dev/null | grep "Qt version 4"`
+if [ "$QT4" != "" ]
+then
+	if [ "$1" = "showlog" ]
+	then
+		sed -i "s/setSectionResizeMode/setResizeMode/g" showlog.cpp
+	fi
+        qmake
+	make
+	echo
+	exit
+fi
+
+QT5=`qmake -v 2>/dev/null | grep "Qt version 5"`
+if [ "$QT5" != "" ]
+then
+	if [ "$1" = "showlog" ]
+	then
+                sed -i "s/setResizeMode/setSectionResizeMode/g" showlog.cpp
+	fi
+        qmake
+	make
+	echo
+	exit
+fi
+
+echo "Error: No qmake-qt4/qmake-qt5/qmake"

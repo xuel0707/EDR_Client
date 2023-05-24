@@ -1,0 +1,55 @@
+策略分成由3个全局结构体变量和多个单独的全局变量组成，conf_global(客户端配置),conf_asset(资源策略),conf_policy(策略信息)，other（其他）
+数据结构的定义在user/conf.h中
+新的值：
+	1、过期，0、未过期
+	1、卸载状态，0、正常
+	1、隔离主机，0、不阻断
+	1、上传主机信息，0、无须
+	周期  默认按天为单位  0 代表一次 1天 7天
+
+读写锁
+	conf_global.lock
+	conf_asset.lock
+	conf_policy.lock
+
+global
+	客户端CPU限制百分比：conf_global.agent_cpu_limit
+	客户端内存限制(MB)：conf_global.agent_memory_limit
+	客户端网络限制(KB/s)：conf_global.agent_network_limit
+	离线日志空间大小 (默认MB单位)：conf_global.offline_space_size
+	心跳间隔时长：conf_global.heartbeat_interval
+	日志采集模式：conf_global.log_collect_mode
+	批量日志发送时间间隔：conf_global.log_collect_interval
+	许可是否过期：conf_global.licence_expire
+	是否允许上传样本：conf_global.allow_upload_sample
+	客户端隔离文件保留空间：conf_global.isolation_space_size
+	许可模块数量：conf_global.module_num
+	服务器IP数量：conf_global.server_num
+	许可模块：conf_global.licence_module[i].list
+	服务器IP：conf_global.server_ip[i].list
+采集
+	周期：conf_asset.cycle
+	采集项个数：conf_asset.num
+	采集项：conf_asset.collect_items[i].name
+策略信息
+	策略ID：conf_policy.policy_id
+	策略名称：conf_policy.policy_name
+	策略更新时间：conf_policy.policy_time
+md5
+	弱口令MD5:weak_passwd_ver_md5
+	ip库MD5:ipwry_ver_md5
+	基线MD5:baseline_ver_md5
+	webshellMD5:webshell_ver_md5
+other
+	客户端版本号：client_ver_global
+	客户端EDR采集器版本号：collect_ver_global
+	病毒库版本号：virus_ver_global
+	漏洞平台版本号：vuln_ver_global
+	基线版本号: baseline_ver_global
+	webshell版本号: webshell_ver_global
+	弱口令版本号：weak_passwd_ver_global
+	ip库版本号: ipwry_ver_global
+	客户端模式：operation_mode_global
+	卸载状态：is_uninstall_global
+	隔离状态：qr_status_global
+	同步状态：is_sync_global

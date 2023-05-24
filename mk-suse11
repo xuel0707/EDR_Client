@@ -1,0 +1,24 @@
+make clean
+make nokern $1
+
+ver=11
+mkdir -p dist2/$ver
+cp -rf dist/* dist2/$ver/
+
+kver=("" \
+      "" \
+      "" \
+      "" \
+      "3.0.101-63")
+
+for((i=4;i<=4;i++))
+do
+	echo
+	echo make $ver.$i kernel module
+	mkdir dist2/$ver.$i
+	make kernel-clean
+	sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/linux-${kver[$i]}-obj\/x86_64\/default/g" kern/Makefile
+	echo "/usr/src/linux-${kver[$i]}-obj/x86_64/default" > kern/kernel_header_dir
+	make kernel
+	cp kern/sniper_edr.ko dist2/$ver.$i/
+done

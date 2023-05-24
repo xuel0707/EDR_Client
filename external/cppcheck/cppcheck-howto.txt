@@ -1,0 +1,10 @@
+tar zxf cppcheck-2.7.tar.gz
+cd cppcheck-2.7
+make
+
+./cppcheck --force 源码文件
+
+./cppcheck --force 源码目录
+
+./cppcheck --force 源码目录 2>/tmp/err.txt
+将检查出的错误存入/tmp/err.txt

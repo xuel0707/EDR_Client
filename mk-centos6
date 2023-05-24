@@ -1,0 +1,40 @@
+make clean
+make nokern $1
+
+mkdir -p dist2/6
+cp -rf dist/* dist2/6/
+
+kver=("2.6.32-71.el6.x86_64" \
+      "2.6.32-131.0.15.el6.x86_64" \
+      "2.6.32-220.el6.x86_64" \
+      "2.6.32-279.el6.x86_64" \
+      "2.6.32-358.el6.x86_64" \
+      "2.6.32-431.el6.x86_64" \
+      "2.6.32-504.el6.x86_64" \
+      "2.6.32-573.el6.x86_64" \
+      "2.6.32-642.el6.x86_64" \
+      "2.6.32-696.el6.x86_64" \
+      "2.6.32-754.el6.x86_64")
+
+for((i=0;i<=10;i++))
+do
+	echo
+	echo make 6.$i kernel module
+	mkdir dist2/6.$i
+	make kernel-clean
+	sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/kernels\/${kver[$i]}/g" kern/Makefile
+	echo "/usr/src/kernels/${kver[$i]}" > kern/kernel_header_dir
+	make kernel
+	cp kern/sniper_edr.ko dist2/6.$i/
+done
+
+
+#支持神州灵云oem项目
+        echo
+        echo "make 5.8uek kernel module"
+        mkdir dist2/5.8uek
+        make kernel-clean
+        sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/kernels\/2.6.32-300.10.1.el5uek/g" kern/Makefile
+        echo "/usr/src/kernels/2.6.32-300.10.1.el5uek" > kern/kernel_header_dir
+        make kernel
+        cp kern/sniper_edr.ko dist2/5.8uek/

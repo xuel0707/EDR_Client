@@ -1,0 +1,13 @@
+echo "#ifndef __SYSTEM_TYPE_H_" > system_type.h
+
+echo "#define SNIPER_ARCH \"`uname -m`\"" >> system_type.h
+
+dpkg -S /boot >/dev/null 2>&1
+if [ $? -eq 0 ]
+then
+	echo "#define SNIPER_FOR_DEBIAN 1" >> system_type.h
+	echo 1
+fi
+
+echo "#endif" >> system_type.h
+echo 0

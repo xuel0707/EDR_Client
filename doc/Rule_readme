@@ -1,0 +1,211 @@
+规则分成由3个全局结构体变量组成，rule_trust_global(可信名单),rule_black_global(黑名单),rule_global_global(全局规则)
+事件名称列表
+	"DetectedByUsers",       # 可疑木马
+	"ReflectiveLoadingAttack",# 内存攻击
+	"ScriptBasedAttack",    # 脚本攻击
+	"ExsitingMalware",      # 驻留病毒
+	"DownloadExecution",    # 恶意程序
+	"Mining", 		  		# 恶意挖矿
+	"Ransomeware", 		  	# 勒索软件
+	"PrivilegeEscalation",  # 非法提权
+	"Chopper", 		  		# 中国菜刀命令执行
+	"Tunnel", 		  		# 隧道搭建
+	"FakeSystemProcess",    # 伪造系统进程运行
+	"SensitiveProgram",     # 可疑命令执行
+	"ServerProcess",        # 对外服务进程异常执行
+	"MBRAttack",            # MBR防护
+	"ReverseShell",         # 反弹shell
+	"Powershell",           # powershell
+	"CommonProcess"         # 一般进程
+	"SensitiveFile" 		# 敏感文件操作
+	"PortScan",       		# 端口扫描超限
+	"HoneyPort",      		# 敏感端口扫描
+	"RemoteLogin"     		# 远程登录
+	"RequestMaliciousDomain",  # 访问恶意域名
+	"DNSQuery"       		# 域名查询
+	"LocalLogin" 		    # 本地用户登录
+	"RiskCommand" 		    # 危险命令执行
+	"AbnormalProcess" 	    # 异常程序执行
+
+读写锁
+	rule_trust_global.lock
+	rule_black_global.lock
+	rule_global_global.lock
+
+可信名单
+	进程
+	进程规则数量：rule_trust_global.process_num
+		进程名称：rule_trust_global.process[i].process_name
+		进程路径：rule_trust_global.process[i].process_path
+		进程参数：rule_trust_global.process[i].process_commandline
+		进程参数条件：rule_trust_global.process[i].param
+		进程md5：rule_trust_global.process[i].md5
+		进程用户：rule_trust_global.process[i].process_user
+		父进程名：rule_trust_global.process[i].parent_process_name
+		远程IP：rule_trust_global.process[i].remote_ip
+		适用事件数量：rule_trust_global.process[i].event_num
+			适用事件：rule_trust_global.process[i].event_names[j].list
+	文件
+	文件规则数量：rule_trust_global.file_num
+		文件名：rule_trust_global.file[i].filename
+		文件路径：rule_trust_global.file[i].filepath
+		后缀：rule_trust_global.file[i].extension
+		md5：rule_trust_global.file[i].md5
+		适用事件数量：rule_trust_global.file[i].event_num
+			适用事件：rule_trust_global.file[i].event_names[j].list
+	IP
+	IP规则数量:rule_trust_global.ip_num
+		IP列表数量：rule_trust_global.ip[i].ip_num
+		IP列表：rule_trust_global.ip[i].ip_list[j].list
+		适用事件数量：rule_trust_global.ip[i].event_num
+		适用事件：rule_trust_global.ip[i].event_names[j].list
+	域名
+	域名规则数量:rule_trust_global.domain_num
+		域名数量：rule_trust_global.domain[i].domain_num
+		域名列表：rule_trust_global.domain[i].domain_list[j].list
+		适用事件数量：rule_trust_global.domain[i].event_num
+		适用事件：rule_trust_global.domain[i].event_names[j].list
+
+过滤名单
+	进程
+	进程规则数量：rule_filter_global.process_num
+		进程名称：rule_filter_global.process[i].process_name
+		进程路径：rule_filter_global.process[i].process_path
+		进程参数：rule_filter_global.process[i].process_commandline
+		进程参数条件：rule_filter_global.process[i].param
+		进程md5：rule_filter_global.process[i].md5
+		进程用户：rule_filter_global.process[i].process_user
+		父进程名：rule_filter_global.process[i].parent_process_name
+		远程IP：rule_filter_global.process[i].remote_ip
+		适用事件数量：rule_filter_global.process[i].event_num
+			适用事件：rule_filter_global.process[i].event_names[j].list
+	文件
+	文件规则数量：rule_filter_global.file_num
+		文件名：rule_filter_global.file[i].filename
+		文件路径：rule_filter_global.file[i].filepath
+		后缀：rule_filter_global.file[i].extension
+		md5：rule_filter_global.file[i].md5
+		适用事件数量：rule_filter_global.file[i].event_num
+			适用事件：rule_filter_global.file[i].event_names[j].list
+	IP
+	IP规则数量:rule_filter_global.ip_num
+		IP列表数量：rule_filter_global.ip[i].ip_num
+		IP列表：rule_filter_global.ip[i].ip_list[j].list
+		适用事件数量：rule_filter_global.ip[i].event_num
+		适用事件：rule_filter_global.ip[i].event_names[j].list
+	域名
+	域名规则数量:rule_filter_global.domain_num
+		域名数量：rule_filter_global.domain[i].domain_num
+		域名列表：rule_filter_global.domain[i].domain_list[j].list
+		适用事件数量：rule_filter_global.domain[i].event_num
+		适用事件：rule_filter_global.domain[i].event_names[j].list
+
+黑名单
+	进程
+	进程规则数量：rule_black_global.process_num
+		进程名称：rule_black_global.process[i].process_name
+		进程路径：rule_black_global.process[i].process_path
+		进程参数：rule_black_global.process[i].process_commandline
+		进程参数条件：rule_black_global.process[i].param
+		进程md5：rule_black_global.process[i].md5
+		进程用户：rule_black_global.process[i].process_user
+		父进程名：rule_black_global.process[i].parent_process_name
+		远程IP：rule_black_global.process[i].remote_ip
+		适用事件数量：rule_black_global.process[i].event_num
+			适用事件：rule_black_global.process[i].event_names[j].list
+	文件
+	文件规则数量：rule_black_global.file_num
+		文件名：rule_black_global.file[i].filename
+		文件路径：rule_black_global.file[i].filepath
+		后缀：rule_black_global.file[i].extension
+		md5：rule_black_global.file[i].md5
+		适用事件数量：rule_black_global.file[i].event_num
+			适用事件：rule_black_global.file[i].event_names[j].list
+	IP
+	IP规则数量:rule_black_global.ip_num
+		IP列表数量：rule_black_global.ip[i].ip_num
+		IP列表：rule_black_global.ip[i].ip_list[j].list
+		适用事件数量：rule_black_global.ip[i].event_num
+		适用事件：rule_black_global.ip[i].event_names[j].list
+	域名
+	域名规则数量:rule_black_global.domain_num
+		域名数量：rule_black_global.domain[i].domain_num
+		域名列表：rule_black_global.domain[i].domain_list[j].list
+		适用事件数量：rule_black_global.domain[i].event_num
+		适用事件：rule_black_global.domain[i].event_names[j].list
+	用户
+	用户规则数量:rule_black_global.user_num
+		用户列表数量：rule_black_global.user[i].user_num
+		用户列表：rule_black_global.user[i].user_list[j].list
+		适用事件数量：rule_black_global.user[i].event_num
+		适用事件：rule_black_global.user[i].event_names[j].list
+	访问控制
+	访问控制规则数量:rule_black_global.access_control_num
+		连接列表数量：rule_black_global.access_control[i].connect_num
+		方向：rule_black_global.access_control[i].connect_list[j].direction
+		协议：rule_black_global.access_control[i].connect_list[j].protocol
+		ip：rule_black_global.access_control[i].connect_list[j].ip
+		端口：rule_black_global.access_control[i].connect_list[j].port
+		适用事件数量：rule_black_global.access_control[i].event_num
+		适用事件：rule_black_global.access_control[i].event_names[j].list
+
+白名单
+	IP
+	IP规则数量:rule_white_global.ip_num
+		IP列表数量：rule_white_global.ip[i].ip_num
+		IP列表：rule_white_global.ip[i].ip_list[j].list
+		适用事件数量：rule_white_global.ip[i].event_num
+		适用事件：rule_white_global.ip[i].event_names[j].list
+	域名
+	域名规则数量:rule_white_global.domain_num
+		域名数量：rule_white_global.domain[i].domain_num
+		域名列表：rule_white_global.domain[i].domain_list[j].list
+		适用事件数量：rule_white_global.domain[i].event_num
+		适用事件：rule_white_global.domain[i].event_names[j].list
+	用户
+	用户规则数量:rule_white_global.user_num
+		用户列表数量：rule_white_global.user[i].user_num
+		用户列表：rule_white_global.user[i].user_list[j].list
+		适用事件数量：rule_white_global.user[i].event_num
+		适用事件：rule_white_global.user[i].event_names[j].list
+	访问控制
+	访问控制规则数量:rule_white_global.access_control_num
+		连接列表数量：rule_white_global.access_control[i].connect_num
+		方向：rule_white_global.access_control[i].connect_list[j].direction
+		协议：rule_white_global.access_control[i].connect_list[j].protocol
+		ip：rule_white_global.access_control[i].connect_list[j].ip
+		端口：rule_white_global.access_control[i].connect_list[j].port
+		适用事件数量：rule_white_global.access_control[i].event_num
+		适用事件：rule_white_global.access_control[i].event_names[j].list
+	风险发现
+		弱口令数量 rule_white_global.risk.weak_passwd_num
+		弱口令
+			ID:rule_white_global.risk.weak_passwd[i].id
+/* 220114版本新增字段 */
+			应用类型数量:rule_white_global.risk.weak_passwd[i].rule.type_num
+			应用类型列表:rule_white_global.risk.weak_passwd[i].rule.app_type[j].list
+/* 220114版本新增字段 */
+			用户列表数量:rule_white_global.risk.weak_passwd[i].rule.list_num
+			用户列表:rule_white_global.risk.weak_passwd[i].rule.list[j].list
+		风险账号数量 rule_white_global.risk.account_num
+		风险账号
+			ID:rule_white_global.risk.account[i].id
+			用户列表数量:rule_white_global.risk.account[i].rule.list_num
+			用户列表:rule_white_global.risk.account[i].rule.list[j].list
+		系统风险数量 rule_white_global.risk.sys_num
+		系统风险
+			ID:rule_white_global.risk.sys[i].id
+			KEY列表数量:rule_white_global.risk.sys[i].rule.list_num
+			KEY列表:rule_white_global.risk.sys[i].rule.list[j].list
+
+全局
+	可信名单
+		可信证书
+		可信证书数量：rule_global_global.trust.sign_num
+			公司名称：rule_global_global.trust.sign[i].company
+			指纹信息：rule_global_global.trust.sign[i].fingerprint
+	黑名单
+		恶意域名数量：rule_global_global.black.domain_num
+			恶意域名：rule_global_global.black.domain[i].list
+		矿池数量：ule_global_global.black.minner_num
+			矿池列表：rule_global_global.black.minner[i].list

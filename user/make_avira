@@ -1,0 +1,271 @@
+echo "#ifndef __AVIRA_H_" > avira.h
+
+
+os_arch=`uname -m`
+
+# 解析可用的安装版本 有新增或修改需要和tools/install.sh中保持统一
+if [ -f /proc/version ]; then
+   #兼容从centos改的系统，比如湖南麒麟3.10.0-957.ky3.kb3.x86_64
+   os=`uname -r | grep -E "[4.18.0|3.10.0|2.6.32|2.6.18|5.15.10|5.16.]"`
+   if [ -n "$os" ]; then
+        os_dist='CentOS'
+
+        os=`awk '{print $3}' /proc/version | sed 's/[-|.]/\n/g'`
+
+        ver1=`echo $os |awk {'print $1'}`
+        ver2=`echo $os |awk {'print $2'}`
+        ver3=`echo $os |awk {'print $3'}`
+        ver4=`echo $os |awk {'print $4'}`
+
+        #5.0-5.11
+        if [ "$ver1" -eq 2 ] && [ "$ver2" -eq 6 ] && [ "$ver3" -eq 18 ]; then
+                os_ver=5
+		if [ "$ver4" -ge 398 ]; then
+			kern_ver=5.11
+		elif [ "$ver4" -ge 371 ]; then
+			kern_ver=5.10
+		elif [ "$ver4" -ge 348 ]; then
+			kern_ver=5.9
+		elif [ "$ver4" -ge 308 ]; then
+			kern_ver=5.8
+		elif [ "$ver4" -ge 274 ]; then
+			kern_ver=5.7
+		elif [ "$ver4" -ge 238 ]; then
+			kern_ver=5.6
+		elif [ "$ver4" -ge 194 ]; then
+			kern_ver=5.5
+		elif [ "$ver4" -ge 164 ]; then
+			kern_ver=5.4
+		elif [ "$ver4" -ge 128 ]; then
+			kern_ver=5.3
+		elif [ "$ver4" -ge 92 ]; then
+			kern_ver=5.2
+		elif [ "$ver4" -ge 53 ]; then
+			kern_ver=5.1
+		else
+			kern_ver=5.0
+		fi
+        fi
+
+        #6.0-6.10
+        if [ "$ver1" -eq 2 ] && [ "$ver2" -eq 6 ] && [ "$ver3" -eq 32 ]; then
+                os_ver=6
+		if [ "$ver4" -ge 754 ]; then
+			kern_ver=6.10
+		elif [ "$ver4" -ge 696 ]; then
+			kern_ver=6.9
+		elif [ "$ver4" -ge 642 ]; then
+			kern_ver=6.8
+		elif [ "$ver4" -ge 573 ]; then
+			kern_ver=6.7
+		elif [ "$ver4" -ge 504 ]; then
+			kern_ver=6.6
+		elif [ "$ver4" -ge 431 ]; then
+			kern_ver=6.5
+		elif [ "$ver4" -ge 358 ]; then
+			kern_ver=6.4
+		elif [ "$ver4" -ge 279 ]; then
+			kern_ver=6.3
+		elif [ "$ver4" -ge 220 ]; then
+			kern_ver=6.2
+		elif [ "$ver4" -ge 131 ]; then
+			kern_ver=6.1
+		else
+			kern_ver=6.0
+		fi
+        fi
+
+        # 7.0-7.9
+        if [ "$ver1" -eq 3 ] && [ "$ver2" -eq 10 ] && [ "$ver3" -eq 0 ]; then
+                os_ver=7
+		if [ "$ver4" -ge 1160 ]; then
+			kern_ver=7.9
+		elif [ "$ver4" -ge 1127 ]; then
+			kern_ver=7.8
+		elif [ "$ver4" -ge 1062 ]; then
+			kern_ver=7.7
+		elif [ "$ver4" -ge 957 ]; then
+			kern_ver=7.6
+		elif [ "$ver4" -ge 862 ]; then
+			kern_ver=7.5
+		elif [ "$ver4" -ge 693 ]; then
+			kern_ver=7.4
+		elif [ "$ver4" -ge 514 ]; then
+			kern_ver=7.3
+		elif [ "$ver4" -ge 327 ]; then
+			kern_ver=7.2
+		elif [ "$ver4" -ge 229 ]; then
+			kern_ver=7.1
+		else
+			kern_ver=7.0
+		fi
+        fi
+
+        # 8.0-8.4
+        if [ "$ver1" -eq 4 ] && [ "$ver2" -eq 18 ] && [ "$ver3" -eq 0 ]; then
+                os_ver=8
+		if [ "$ver4" -ge 305 ]; then
+			kern_ver=8.4
+		elif [ "$ver4" -ge 240 ]; then
+			kern_ver=8.3
+		elif [ "$ver4" -ge 193 ]; then
+			kern_ver=8.2
+		elif [ "$ver4" -ge 147 ]; then
+			kern_ver=8.1
+		else
+			kern_ver=8.0
+		fi
+        fi
+
+	# centos7内核升级到5.15.10视为7.10，升级到5.16.1视为7.11
+        if [ "$ver1" -eq 5 ] && [ "$ver2" -eq 15 ] && [ "$ver3" -eq 10 ]; then
+                os_ver=7
+		kern_ver=7.10
+	fi
+	if [ "$ver1" -eq 5 ] && [ "$ver2" -eq 16 ]; then
+                os_ver=7
+		if [ "$ver3" -lt 7 ]; then
+			kern_ver=7.11
+		else
+			kern_ver=7.12
+		fi
+	fi
+
+	# 支持神州灵云oem项目
+	os=`awk '{print $3}' /proc/version`
+	if [ "$os" = "2.6.32-300.10.1.el5uek" ]; then
+		os_ver=5
+		kern_ver=5.8uek
+	fi
+   fi
+
+   # oracle linux内核升级到4.1.12-94.3.9.el7uek.x86_64视为7.13
+   os=`grep -i 'Red Hat' /proc/version`
+   if [ -n "$os" ]; then
+	os_dist='CentOS'
+
+	if [ -f /etc/os-release ]; then
+		os=`grep "7.4" /etc/os-release`
+		if [ "$os" != "" ]; then
+			os_ver=7
+		fi
+
+		os=`awk '{print $3}' /proc/version`
+		if [ "$os" = "4.1.12-94.3.9.el7uek.x86_64" ]; then
+			kern_ver=7.13
+		fi
+        fi
+   fi
+
+   os=`grep -i ubuntu /proc/version`
+   if [ -n "$os" ]; then
+	os_dist='Ubuntu'
+
+	os=`grep "16.04" /etc/os-release`
+	if [ "$os" != "" ]; then
+		os_ver=16.04
+	fi
+
+	os=`grep "18.04" /etc/os-release`
+	if [ "$os" != "" ]; then
+		os_ver=18.04
+	fi
+
+	os=`awk '{print $3}' /proc/version`
+	if [ "$os" = "4.15.0-132-generic" ]; then
+		kern_ver=4.15.0-132
+	fi
+	if [ "$os" = "4.4.0-210-generic" ]; then
+		kern_ver=4.4.0-210
+	fi
+	if [ "$os" = "4.15.0-122-generic" ]; then
+		kern_ver=4.15.0-122
+	fi
+
+   fi
+
+   os=`grep -i suse /proc/version`
+   if [ -n "$os" ]; then
+        os_dist='SUSE'
+
+        os=`awk '{print $3}' /proc/version | sed 's/[-|.]/\n/g'`
+
+        ver1=`echo $os |awk {'print $1'}`
+        ver2=`echo $os |awk {'print $2'}`
+        ver3=`echo $os |awk {'print $3'}`
+        ver4=`echo $os |awk {'print $4'}`
+
+        # 11.4
+        if [ "$ver1" -eq 3 ] && [ "$ver2" -eq 0 ] && [ "$ver3" -eq 101 ]; then
+                os_ver=11
+		kern_ver=11.4
+        fi
+
+        # 12.4/5，15.1
+        if [ "$ver1" -eq 4 ] && [ "$ver2" -eq 12 ] && [ "$ver3" -eq 14 ]; then
+		if [ "$ver4" -ge 195 ]; then
+                	os_ver=15
+			kern_ver=15.1
+		elif [ "$ver4" -ge 120 ]; then
+                	os_ver=12
+			kern_ver=12.5
+		elif [ "$ver4" -ge 94 ]; then
+                	os_ver=12
+			kern_ver=12.4
+		fi
+        fi
+   fi
+
+   os=`grep -i kylin /etc/*release`
+   if [ -n "$os" ]; then
+      os=`awk '{print $3}' /proc/version`
+      if [ "$os" = "4.19.90-17.ky10.aarch64" ]; then
+         os_dist='KylinServer'
+         os_ver=10
+         kern_ver=4.19.90-17
+      elif [ "$os" = "4.19.90-24.4.v2101.ky10.aarch64" ]; then
+         os_dist='KylinServer'
+         os_ver=10
+	 kern_ver=4.19.90-24
+      elif [ "$os" = "5.4.18-27-generic" ]; then
+         os_dist='KylinDesktop'
+         os_ver=10
+	 kern_ver=5.4.18-27
+      elif [ "$os" = "5.4.18-35-generic" ]; then
+         os_dist='KylinDesktop'
+         os_ver=10
+	 kern_ver=5.4.18-35
+
+      elif [ "$os" = "4.19.90-21.2.ky10.x86_64" ]; then
+         os_dist='KylinServer'
+         os_ver=10
+         kern_ver=4.19.90-21
+      elif [ "$os" = "4.19.90-24.4.v2101.ky10.x86_64" ]; then
+         os_dist='KylinServer'
+         os_ver=10
+         kern_ver=4.19.90-24
+      fi
+   fi
+fi
+
+if [ "$use_rh6" = "" ]; then
+	echo "#define OS_DIR \"$os_arch/$os_dist/$os_ver\"" >> avira.h
+else
+	echo "#define OS_DIR \"$os_arch/RedHat/$os_ver\"" >> avira.h
+fi
+
+echo "int main(void) { return 0; }" > avria-test.c
+cc -o avria-test avria-test.c ./lib/libiconv.so.2 ./lib/libsavapi.so 2>/dev/null
+if [ $? -eq 0 ]
+then
+	# 编译成功说明avira可用
+	echo "#define USE_AVIRA 1" >> avira.h
+	echo "#endif" >> avira.h
+	echo 1
+else
+	echo "#endif" >> avira.h
+	echo 0
+fi
+
+rm -f avria-test avria-test.c
+

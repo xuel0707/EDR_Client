@@ -1,0 +1,241 @@
+#!/bin/sh
+#
+# Author: zhengxiang
+#
+# 检查.c/.h/.cpp文件的编程风格是否符合规范，依次检查以下内容
+# 1. scanf有越界风险
+# 2. 禁用strcat/strcpy/strncpy，用snprintf代替
+# 3. fgets有越界风险
+# 4. snprintf有越界风险
+# 5. 注释比率低于10%
+# 6. 语句行以空格符结尾
+# 7. 同一行中空格缩进和tab缩进混用
+# 8. 文件应只使用一种缩进风格，要么全都空格缩进，要么全都tab缩进
+# 9. ++运算符为语句的唯一运算符
+# 10. --运算符为语句的唯一运算符
+#
+
+c=`echo $0 | cut -c1`
+if [ "$c" = "/" ]
+then
+	tooldir=`dirname $0`
+else
+	fullpath="`pwd`/$0"
+	tooldir=`dirname $fullpath`
+fi
+
+file=$1
+if [ "$file" = "" -o ! -f $file ]
+then
+	echo "Usage: $0 file [all]"
+	exit 1
+fi
+
+all=0
+if [ "$2" = "all" ]
+then
+	all=1
+fi
+
+myexit()
+{
+	if [ $all -eq 0 ]
+	then
+		exit 1
+	fi
+	echo
+}
+
+check_buflen()
+{
+	err=0
+	grep -nw "$1" $2 2>/dev/null > .tmpfile
+	while read line
+	do
+		#取函数的第一个参数和第二个参数
+		str=`echo $line | sed "s/^.*$1//g" | cut -f2- -d'(' | tr -d ','`
+		buf=`echo $str | awk '{print $1}'`
+		len=`echo $str | awk '{print $2}'`
+
+		if [ "$len" != "sizeof($buf)" -a "$len" != "${buf}_len" ]
+		then
+			echo $line
+			err=1
+		fi
+	done < .tmpfile
+	rm -f .tmpfile
+	return $err
+}
+
+#仅检查.c、.cpp和.h文件
+ret1=`echo $file | grep "\.c$"`
+ret2=`echo $file | grep "\.h$"`
+ret3=`echo $file | grep "\.cpp$"`
+if [ "${ret1}" = "" -a "${ret2}" = "" -a "${ret3}" = "" ]
+then
+	exit 0
+fi
+
+grep -n "scanf" $file 2>/dev/null | grep -E "%s|%\["
+if [ $? -eq 0 ]
+then
+	echo
+	echo "===警告: 要说明待拷贝的字符数，一般是字符数组的大小减一，以防止scanf越界"
+	echo
+	echo "如"
+	echo "     char *str = \"aaa:bbb\";"
+	echo "     char buf[64] = {0};"
+	echo
+	echo "     sscanf(str, \"%s\", buf);            错误"
+	echo
+	echo "     sscanf(str, \"%63s\", buf);          正确"
+	echo "     sscanf(str, \"%63[^:]\", buf);       正确"
+	echo
+	myexit
+fi
+
+grep -nE "strcat|strcpy|strncpy" $file 2>/dev/null
+if [ $? -eq 0 ]
+then
+	echo
+	echo "===警告: 请用snprintf替代strcat/strcpy/strncpy"
+	echo
+	echo "建议用法"
+	echo "  1. 对于字符数组"
+	echo "     char buf[BUFLEN] = {0};"
+	echo "     char *value = \"this is a example\";"
+	echo
+	echo "     snprintf(buf, sizeof(buf), \"this is a example\"); 或"
+	echo "     snprintf(buf, sizeof(buf), \"%s\", value);"
+	echo
+	echo "  2. 对于指针变量"
+	echo "     void example(char *buf, int buf_len, char *value)"
+	echo "     snprintf(buf, buf_len, \"%s\", value);"
+	echo
+	echo "  注1：长度必须是xxx_len的形式，xxx是指针变量的名字，如指针变量是tmp，则字符空间长度为tmp_len"
+	echo "  注2：对于指针变量，不可使用sizeof(buf)，指针变量的sizeof值固定是8，并不是字符空间的长度"
+	echo
+	myexit
+fi
+
+check_buflen fgets $file
+if [ $? -ne 0 ]
+then
+	echo
+	echo "===警告: fgets的第二个参数采用下面的形式，以避免以后改变字符数组定义，字符数组变小导致越界"
+	echo
+	echo "建议用法"
+	echo "  1. 对于字符数组"
+	echo "     char buf[BUFLEN] = {0};"
+	echo "     fgets(buf, sizeof(buf), fp);"
+	echo
+	echo "  2. 对于指针变量"
+	echo "     fgets(buf, buf_len, fp);"
+	echo
+	echo "  注1：长度必须是xxx_len的形式，xxx是指针变量的名字，如指针变量是tmp，则字符空间长度为tmp_len"
+	echo "  注2：对于指针变量，不可使用sizeof(buf)，指针变量的sizeof值固定是8，并不是字符空间的长度"
+	echo
+	myexit
+fi
+
+check_buflen snprintf $file
+if [ $? -ne 0 ]
+then
+	echo
+	echo "===警告: snprintf的第二个参数采用下面的形式，以避免以后改变字符数组定义，字符数组变小导致越界"
+	echo
+	echo "建议用法"
+	echo "  1. 对于字符数组"
+	echo "     char buf[BUFLEN] = {0};"
+	echo "     snprintf(buf, sizeof(buf), ..."
+	echo
+	echo "  2. 对于指针变量"
+	echo "     snprintf(buf, buf_len, ..."
+	echo
+	echo "  注1：长度必须是xxx_len的形式，xxx是指针变量的名字，如指针变量是tmp，则字符空间长度为tmp_len"
+	echo "  注2：对于指针变量，不可使用sizeof(buf)，指针变量的sizeof值固定是8，并不是字符空间的长度"
+	echo
+	myexit
+fi
+
+p=`$tooldir/zxcloc $file | grep -v Percent | awk '{print $5}' | cut -f1 -d'.'`
+if [ $p -lt 10 ]
+then
+	echo
+	echo "===警告: 注释比率低于10%"
+	echo
+	$tooldir/zxcloc $file
+	myexit
+fi
+
+grep -n "[[:space:]]$" $file
+if [ $? -eq 0 ]
+then
+	echo
+	echo "===警告: 语句行以空格符结尾"
+	echo
+	myexit
+fi
+
+#输入tab的方法：先输入ctrl-v，然后按tab键
+
+grep -n " 	" $file                #空格+tab的行
+ret1=$?
+grep -n "	 \{8,\}" $file          #tab+8个以上空格的行
+ret2=$?
+if [ ${ret1} -eq 0 -o ${ret2} -eq 0 ]
+then
+	echo
+	echo "===警告: 同一行中空格缩进和tab缩进不可混用"
+	echo
+	myexit
+fi
+
+n1=`grep "^	" $file | wc -l`       #tab开头的行数
+n2=`grep "^    "  $file | wc -l`       #空格开头的行数
+n=`expr ${n1} + ${n2}`
+if [ ${n} -gt ${n1} -a ${n} -gt ${n2} ]
+then
+	echo
+	echo "===警告: 空格缩进${n2}行，tab缩进${n1}行，请统一用一种缩进风格"
+	echo
+	echo "查看空格缩进行的命令：grep -n \"^    \" $file"
+	echo "查看tab缩进行的命令：grep -n \"^[[:space:]]\" $file | grep -v \"^[0-9]*: \""
+	echo
+	#如何将行首多个tab替换成多个4空格呢
+	#echo "将行首8个空格缩进转成tab缩进的命令：sed -i \"s/^        /\t/g\" $file"
+	#echo "将行首tab缩进转成8个空格缩进的命令：sed -i \"s/^\t/        /g\" $file"
+	#echo "将行首tab缩进转成4个空格缩进的命令：sed -i \"s/^\t/    /g\" $file"
+	#echo
+	myexit
+fi
+
+grep -n "++" $file | grep -v "+++" | grep -v "++;" | grep -v "++) {"
+if [ $? -eq 0 ]
+then
+	echo
+	echo "===警告: ++运算符应为语句唯一运算符，请按下面两种形式使用"
+	echo
+	echo "建议用法"
+	echo "  1. i++;"
+	echo "  2. for (i = 0; i < n; i++) {"
+	echo "注：如果有++i这样的写法，改成i++"
+	echo
+	myexit
+fi
+
+grep -n "\-\-" $file | grep -v "\-\-\-" | grep -v "\-\-;" | grep -v "\-\-) {" | grep -v "\"\-\->\"" | grep -v "printf(\"  \-\-" | grep -v "\-\-status"
+if [ $? -eq 0 ]
+then
+	echo
+	echo "===警告: --运算符应为语句唯一运算符，请按下面两种形式使用"
+	echo
+	echo "建议用法"
+	echo "  1. i--;"
+	echo "  2. for (i = 0; i < n; i--) {"
+	echo "注：为了避免误检，注释和打印语句中不要使用--"
+	echo
+	myexit
+fi
+
+exit 0

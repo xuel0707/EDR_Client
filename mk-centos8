@@ -1,0 +1,44 @@
+make clean
+make nokern $1
+
+rm -rf dist2
+mkdir -p dist2/8
+cp -rf dist/* dist2/8/
+
+kver=("4.18.0-80.el8.x86_64"  \
+      "4.18.0-147.el8.x86_64" \
+      "4.18.0-193.el8.x86_64" \
+      "4.18.0-240.el8.x86_64" \
+      "4.18.0-305.12.1.el8_4.x86_64")
+
+for((i=0;i<=4;i++))
+do
+	echo
+	echo make 8.$i kernel module
+	mkdir dist2/8.$i
+	make kernel-clean
+	sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/kernels\/${kver[$i]}/g" kern/Makefile
+	echo "/usr/src/kernels/${kver[$i]}" > kern/kernel_header_dir
+	make kernel
+	cp kern/sniper_edr.ko dist2/8.$i/
+	/usr/src/kernels/${kver[$i]}/scripts/sign-file sha256 cert/x509.priv cert/x509.der kern/sniper_edr.ko dist2/8.$i/sniper_edr.sign.ko
+done
+
+#下面针对的是centos7内核升级的情况
+#下面两个内核版本是用gcc (GCC) 9.3.1 20200408 (Red Hat 9.3.1-2)编译的，centos8上是gcc (GCC) 8.4.1 20200928 (Red Hat 8.4.1-1)，也可以编
+kver=("5.15.10-1.el7.elrepo.x86_64" \
+      "5.16.1-1.el7.elrepo.x86_64"  \
+      "5.16.7-1.el7.elrepo.x86_64")
+
+for((i=0;i<=2;i++))
+do
+	echo
+	echo make 7.1$i kernel module
+	mkdir dist2/7.1$i
+	make kernel-clean
+	sed -i "s/^KERNELDIR.*/KERNELDIR := \/usr\/src\/kernels\/${kver[$i]}/g" kern/Makefile
+	echo "/usr/src/kernels/${kver[$i]}" > kern/kernel_header_dir
+	make kernel
+	cp kern/sniper_edr.ko dist2/7.1$i/
+	/usr/src/kernels/${kver[$i]}/scripts/sign-file sha256 cert/x509.priv cert/x509.der kern/sniper_edr.ko dist2/7.$i/sniper_edr.sign.ko
+done
