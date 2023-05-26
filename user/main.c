@@ -791,7 +791,7 @@ static void *heartbeat_send(void *ptr)
 		/* upload_sysinfo很耗时间，程序启动时不在主进程register_client时做，在心跳线程里做 */
 		/* 启动资产清点，默认全部采集 */
 		printf("upload_sysinfo ...\n");
-		// upload_sysinfo(1);
+		upload_sysinfo(1);
 		printf("upload_sysinfo done\n");
 	} else {
 		init_register_client(); //注册成功会做upload_sysinfo
@@ -828,7 +828,7 @@ static void *heartbeat_send(void *ptr)
 
 		pthread_rwlock_unlock(&conf_global.lock);
 
-		// ret = http_post("api/client/heartbeat", post, reply, sizeof(reply));
+		ret = http_post("api/client/heartbeat", post, reply, sizeof(reply));
 		DBG2(DBGFLAG_HEARTBEAT,"heartbeat to %s:%d ret %d, reply: %s\n",
 					Serv_conf.ip, Serv_conf.port, ret, reply);
 		if (ret < 0) {
@@ -976,7 +976,7 @@ struct sniper_thread_struct sniper_thread[SNIPER_THREAD_MAX] = {
 	// { 0, &cdrom_tr,      burn_mgr,            "cdrom" },
 	// { 0, &inotify_tr,    inotify_monitor,     "inotify" },
 	// { 0, &uevent_tr,     uevent_monitor,      "uevent" },
-	// { 0, &selfcheck_tr,  self_check,          "selfcheck" },
+	{ 0, &selfcheck_tr,  self_check,          "selfcheck" },
 #ifdef USE_AVIRA
 	// { 0, &kvirusmsg_tr,  kvirus_msgd,         "kvirus_msgd" },
 	// { 0, &virusfilter_tr,virusfilter_monitor, "virusfilter" },
@@ -1384,9 +1384,15 @@ static void enable_trace(int signum)
 /*
 *Ctrl+C的处理函数
 */
+// 关闭连接和服务器 Socket
+extern int new_socket;
+extern int server_fd;
 static void signalHandler(int signal_num) {
     printf("\nTermination signal received. Exiting the program...\n");
 	optarg="ZH94f2J1cH19Tnx0";
+	// 关闭连接和服务器 Socket
+    close(new_socket);
+    close(server_fd);
 	if (monstop(optarg, 0) < 0) {
 		exit(1);
 	}

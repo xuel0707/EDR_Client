@@ -1002,6 +1002,123 @@ int upload_sysinfo(int sync)
     return -2;
 }
 
+
+
+//接收faasmonitor的数据
+int server_fd=0, new_socket=0;
+ssize_t bytesRead = -1;
+struct sockaddr_in address;
+int addrlen = sizeof(address);
+#define BUFFER_SIZE 8192
+
+//去掉无效字符
+void removeInvalidChars(char* input, char* output) {
+    int i, j = 0;
+    int len = BUFFER_SIZE;
+
+    for (i = 0; i < len; i++) {
+        if (input[i] >= 32 && input[i] <= 126) {
+            output[j] = input[i];
+            j++;
+        }
+    }
+
+    output[j] = '\0';  // 添加字符串结束符
+}
+
+void recvdata_fromFaasMonitor()
+{
+    char buffer[BUFFER_SIZE];
+    
+     // 接受客户端连接
+    new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen);
+    if (new_socket == -1) {
+        perror("Failed to accept client connection");
+        return;
+    }
+
+    // 接收客户端数据
+    memset(buffer, 0, BUFFER_SIZE); 
+    bytesRead =recv(new_socket, buffer, BUFFER_SIZE, 0);
+    if (bytesRead <0) {
+        perror("Failed to receive data from client");
+        goto out;
+    }
+    // printf("received %d bytes\n", bytesRead);
+
+    char output[BUFFER_SIZE];
+    removeInvalidChars(buffer, output);
+    // printf("Output: %s\r\n", output);
+
+    // 搜索 JSON 字符串的起始位置
+    char *jsonStart = strstr(output, "{");
+    if (jsonStart == NULL) {
+        printf("Invalid JSON data\n");
+        printf("%s",buffer);
+        goto out;
+    }
+
+    cJSON *root = cJSON_Parse(jsonStart);
+    if (root == NULL) {
+        printf("Failed to parse JSON data\n");
+        cJSON_Delete(jsonStart);
+        goto out;
+    }
+
+
+    cJSON *object = cJSON_CreateObject();
+    if(object==NULL){
+        printf("Failed to cJSON_CreateObject\n");
+        cJSON_Delete(jsonStart);
+        cJSON_Delete(root);
+        goto out;
+    }
+
+
+    cJSON_AddStringToObject(object, "uuid", Sys_info.sku);
+    cJSON_AddNumberToObject(object,"Time", cJSON_GetObjectItem(root, "Time")->valuedouble);
+    cJSON_AddNumberToObject(object,"Pid", cJSON_GetObjectItem(root, "Pid")->valueint);
+    cJSON_AddStringToObject(object,"Action", cJSON_GetObjectItem(root, "Action")->valuestring);
+    cJSON_AddStringToObject(object,"Arg", cJSON_GetObjectItem(root, "Arg")->valuestring);
+    cJSON_AddStringToObject(object,"Relation", cJSON_GetObjectItem(root, "Relation")->valuestring);
+    cJSON_AddNumberToObject(object,"Mode", cJSON_GetObjectItem(root, "Mode")->valueint);
+    cJSON_AddStringToObject(object,"command", cJSON_GetObjectItem(root, "Command")->valuestring);
+    cJSON_AddStringToObject(object,"Filename", cJSON_GetObjectItem(root, "Filename")->valuestring);
+    cJSON_AddStringToObject(object,"SrcIP", cJSON_GetObjectItem(root, "SrcIP")->valuestring);
+    cJSON_AddNumberToObject(object,"SrcPort", cJSON_GetObjectItem(root, "SrcPort")->valueint);
+    cJSON_AddStringToObject(object,"DesIP", cJSON_GetObjectItem(root, "DesIP")->valuestring);
+    cJSON_AddNumberToObject(object,"DesPort", cJSON_GetObjectItem(root, "DesPort")->valueint);
+    cJSON_AddStringToObject(object,"Container", cJSON_GetObjectItem(root, "Containerid")->valuestring);
+    cJSON_AddStringToObject(object,"Host", cJSON_GetObjectItem(root, "Hostname")->valuestring);
+    
+    sendFaasDatatoEDRServer(object);
+    
+    // cJSON_Delete(jsonStart);
+    // cJSON_Delete(root);
+    cJSON_Delete(object);
+    
+
+out:
+    close(new_socket);
+}
+
+//发送采集数据给管控
+void sendFaasDatatoEDRServer(cJSON *object)
+{
+    if (NULL==object) return;
+    char reply[REPLY_MAX] = {0};
+    char *post = NULL;
+
+    post = cJSON_PrintUnformatted(object);
+    int ret = http_post("api/client/faasdata", post, reply, sizeof(reply));
+    if (ret < 0) {
+        printf("faas data fail, reply:%s\n", reply);
+    }else printf("faasdata success, reply:%s\n", reply);
+    printf("post faasdata: %s\n", post);
+
+    if (post)    free(post);
+}
+
 /* selfcheck thread */
 void *self_check(void *ptr)
 {
@@ -1022,40 +1139,71 @@ void *self_check(void *ptr)
     prctl(PR_SET_NAME, "sysstat_monitor");
     save_thread_pid("selfcheck", SNIPER_THREAD_SELFCHECK);
 
+    // 创建 TCP Server Socket
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd == -1) {
+        perror("Failed to create server socket");
+        exit(1);
+    }
+    // 设置服务器地址和端口
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(9088);
+
+    // 绑定 Socket 到指定地址和端口
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("Failed to bind");
+        exit(1);
+    }
+
+    // 监听连接请求
+    if (listen(server_fd, 3) < 0) {
+        perror("Failed to listen");
+        exit(1);
+    }
+
+    printf("Server started, waiting for faas monitor connections...\n");
+    
+
     while (Online) {
+
+        recvdata_fromFaasMonitor();
+
+        continue;
+
         dump_snipermem();
 
         /* 检查待转储的日志文件 */
         check_log_to_send("selfcheck");
 
-	/* 
-	 * 检查客户端是否需要关闭或启动
-	 * 重新启动的时候需要更新内核策略
-	 * 关闭的时候内核策略在进程/文件/网络的线程里面去关
-	 */
-	if (access(CLIENT_DISABLE, F_OK) == 0) {
-		if (client_disable == TURN_MY_OFF) {
-			INFO("stop client work\n");
-			send_client_operation_msg(stopstr);
-			client_disable = TURN_MY_ON;
-		}
-	} else {
-		if (client_disable == TURN_MY_ON) {
-			INFO("start client work\n");
+        /* 
+        * 检查客户端是否需要关闭或启动
+        * 重新启动的时候需要更新内核策略
+        * 关闭的时候内核策略在进程/文件/网络的线程里面去关
+        */
+        if (access(CLIENT_DISABLE, F_OK) == 0) {
+            if (client_disable == TURN_MY_OFF) {
+                INFO("stop client work\n");
+                send_client_operation_msg(stopstr);
+                client_disable = TURN_MY_ON;
+            }
+        } else {
+            if (client_disable == TURN_MY_ON) {
+                INFO("start client work\n");
 
-			send_client_operation_msg(startstr);
-			client_disable = TURN_MY_OFF;
+                send_client_operation_msg(startstr);
+                client_disable = TURN_MY_OFF;
 
-			/* 拉取配置和策略，防止关停之后有更新 */
-			get_conf(reason, sizeof(reason));
-		}
-	}
+                /* 拉取配置和策略，防止关停之后有更新 */
+                get_conf(reason, sizeof(reason));
+            }
+        }
 
-	/* 如果过期/停止客户端工作，什么也不做 */
-	if (conf_global.licence_expire || client_disable == TURN_MY_ON) {
-		sleep(STOP_WAIT_TIME);
-		continue;
-	}
+        /* 如果过期/停止客户端工作，什么也不做 */
+        if (conf_global.licence_expire || client_disable == TURN_MY_ON) {
+            sleep(STOP_WAIT_TIME);
+            continue;
+        }
 
         /* 1分钟检查做一次资源监控 */
         if (i % 2 == 0) {
@@ -1081,7 +1229,7 @@ void *self_check(void *ptr)
             if (fasten_policy_global.resource.process.enable) {
                 check_pid_status();
             }
-
+            
             pthread_rwlock_unlock(&fasten_policy_global.lock);
             i = 0;
         }
@@ -1106,10 +1254,11 @@ void *self_check(void *ptr)
             start_seconds += day_seconds * conf_asset.cycle;
         }
 
-	clean_expired_rulefile();
+	    clean_expired_rulefile();
 
         mysleep(30);
     }
+    close(server_fd);
     conn_db_release();
     location_db_release();
     cpu_db_release();
