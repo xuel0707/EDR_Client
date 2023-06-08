@@ -8,6 +8,12 @@
 
 #define MAX_ARGS    8
 
+typedef unsigned short int umode_t;
+struct my_timeval {
+	long tv_sec;    /* Seconds.  */
+	long tv_usec;   /* Microseconds.  */
+};
+
 struct task_simple_info {
 	uid_t uid;
 	uid_t euid;
@@ -46,11 +52,86 @@ struct taskreq_t {
 	char args[MAX_ARGS][32];           // Used to store the arguments.
 };
 
+struct filereq_t {
+	uid_t uid;       // The user id.
+	int tgid;      // The Thread Group id.
+	pid_t pid;       // The process id.
+	// int did_exec;  // The flag that whether a file is over.
+	struct my_timeval event_tv;
+	unsigned long proctime;      // the time that process started.
+	unsigned long pipein;        // The pipe used to input.
+	unsigned long pipeout;       // The pipe used to output.
+	unsigned long exeino;        // ???
+	struct file *exe_file;       // ???
+	unsigned short op_type;      // The file operation (1:open 2:close 3:unlink 4:rename 5:symlink)
+	unsigned short type;         // 1:sensitive 2:log_delete 3:safe 4:logcollector
+	unsigned short size;         // request size: head + args
+	unsigned int mode;
+	unsigned int flags;
+	unsigned int mnt_id;
+	long mtime_sec;              // The mtime of the file, unit is second.
+	long mtime_nsec;             // The mtime of the filem unit is nanosecond.
+	long long int file_size;
+	long long int newfile_size;
+	struct parent_info pinfo;    // The parent processes information (Up to 4 generations).
+	char comm[16];
+	char parent_comm[16];
+	char filename[64];
+	unsigned int path_len;
+	char new_filename[64];
+	unsigned int newpath_len;
+	char pro_pathname[64];
+	unsigned int pro_len;
+	int terminate;               // Been Abandoned, used to Judge whether the Block is needed.
+	char tty[S_TTYLEN];
+	char nodename[S_NAMELEN+1];
+	char cmd[S_CMDLEN];
+	char cwd[S_CWDLEN];
+	char args[8][64];            // Used to store the arguments.
+
+};
+
 struct sys_enter_execve_args{
 	char unused[16];
 	const char *filename;   // the path of the executable file.
 	const char **argv ;     // the arguments of the process.
 };
+
+struct sys_enter_file_open_args {
+	// unsigned short common_type;
+	// unsigned char common_flags;
+	// unsigned char common_preempt_count;
+	// int common_pid;
+	char buf[8];
+	int __syscall_nr;
+	const char *filename;
+	long flags;
+	long mode;
+};
+
+
+struct sys_enter_file_openat_args {
+	// unsigned short common_type;
+	// unsigned char common_flags;
+	// unsigned char common_preempt_count;
+	// int common_pid;
+	char buf[24];
+	const char *filename;
+	long flags;
+	long mode;
+};
+
+struct sys_enter_file_rename_args {
+	// unsigned short common_type;
+	// unsigned char common_flags;
+	// unsigned char common_preempt_count;
+	// int common_pid;
+	char buf[16];
+	const char *old_filename;
+	const char *new_filename;
+};
+
+
 
 struct TestStruct {
 	int length;
