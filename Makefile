@@ -8,6 +8,7 @@ HYDRA = external/hydra_9.2
 
 EBPF_DIR = sniper-ebpf
 EBPF_EXECVE_HOOK_PROGRAM = lsm_kern.o
+EBPF_FILE_HOOK_PROGRAM = ebpf_file_kern.o
 
 # 如果开发机禁止sh执行非白名单脚本，把sh script改为cat script | sh
 
