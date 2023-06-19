@@ -88,6 +88,16 @@ struct filereq_t {
 	char cmd[S_CMDLEN];
 	char cwd[S_CWDLEN];
 	char args[8][64];            // Used to store the arguments.
+};
+
+struct netreq_t {
+	unsigned char comm[16];
+	__u16 sport;
+	__be16 dport;
+	__be32 saddr;
+	__be32 daddr;
+	__u32 pid;
+	unsigned char  containerid[32];
 
 };
 

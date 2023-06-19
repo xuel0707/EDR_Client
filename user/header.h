@@ -269,6 +269,7 @@ extern time_t login_strategy_time;
 #define MODULE_FILE_NAME        "sniper_edr.ko"
 
 #define EBPF_EXECVE_HOOK_PROGRAM	"lsm_kern.o"
+#define EBPF_FILE_HOOK_PROGRAM  "ebpf_file_kern.o"
 
 #define LOGFILE                 "/var/log/antiapt.log"
 #define LOGFILE1                "/var/log/antiapt.log.1"
@@ -631,6 +632,7 @@ extern void save_thread_time(unsigned int thread_seq);
 /* kebpf.c */
 enum {
     EBPF_EXECVE = 0,
+	EBPF_FILE = 1,
     EBPF_PROGRAMS_NUM,
 };
 extern int load_ebpf_program(void);
@@ -965,8 +967,13 @@ extern void init_encrypt_db(void);
 extern void fini_encrypt_db(void);
 extern void create_file(char *path);
 extern void check_dir_trap_files(char *path, int hide, int type);
+#if 0
 extern void add_record_to_encrypt_db(filereq_t *rep, struct file_msg_args *msg);
 extern void report_encrypt_msg(filereq_t *rep, struct file_msg_args *msg);
+#else
+extern void add_record_to_encrypt_db(struct ebpf_filereq_t *rep, struct file_msg_args *msg);
+extern void report_encrypt_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg);
+#endif
 
 /* check_sys_danger.c*/
 extern void check_sys_danger(task_recv_t *msg);

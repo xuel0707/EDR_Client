@@ -304,8 +304,11 @@ void fini_encrypt_db(void)
 	sqlite3_finalize(encrypt_update_stmt);
 	sqlite3_close_v2(encrypt_db);
 }
-
+#if 0
 void add_record_to_encrypt_db(filereq_t *rep, struct file_msg_args *msg)
+#else
+void add_record_to_encrypt_db(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
+#endif
 {
 	char buf[1024] = {0};
 	int rc = 0, nrow = 0, ncolumn = 0;
@@ -458,8 +461,11 @@ void add_record_to_encrypt_db(filereq_t *rep, struct file_msg_args *msg)
 	cJSON_Delete(object);
 	free(post);
 }
-
+#if 0
 void report_encrypt_msg(filereq_t *rep, struct file_msg_args *msg)
+#else
+void report_encrypt_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
+#endif
 {
 	cJSON *object = NULL, *arguments = NULL;
 	char uuid[S_UUIDLEN] = {0}, reply[REPLY_MAX] = {0}, *post = NULL;
@@ -546,6 +552,7 @@ void report_encrypt_msg(filereq_t *rep, struct file_msg_args *msg)
 
 	/* 可信名单下不报事件，日志级别为普通，不阻断 */
 	/* 运维和学习模式下在内核修改了rep->terminate为0 */
+#if 0
 	if (rep->is_trust == 1) {
 		event = false;
 		level = MY_LOG_NORMAL;
@@ -554,6 +561,7 @@ void report_encrypt_msg(filereq_t *rep, struct file_msg_args *msg)
 		event = true;
 		level = MY_LOG_HIGH_RISK;
 	}
+#endif
 
 	behavior = MY_BEHAVIOR_ABNORMAL;
 	if (rep->terminate == 1) {

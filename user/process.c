@@ -881,8 +881,7 @@ static void send_process_msg(proc_msg_t *msg, taskstat_t *taskstat, int debug)
 	client_send_msg(post, reply, sizeof(reply), LOG_URL, "process");
 #else
 	// TODO(luoyinhong)
-	// printf("client send msg: %s\n", post);
-	printf(".");
+	printf("client send msg: %s\n", post);
 #endif
 
 	/* 没有发送过的进程日志，不报进程退出日志 */

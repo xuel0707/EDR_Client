@@ -1202,7 +1202,6 @@ int get_connout_socket_info(pid_t pid, sockinfo_t *info, int port)
 
 int process_alive(pid_t pid)
 {
-	printf("process_alive pid=%d\n",pid);
 	if (mykill(pid, 0) < 0) {
 		return 0;
 	}

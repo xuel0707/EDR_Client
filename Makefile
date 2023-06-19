@@ -9,6 +9,7 @@ HYDRA = external/hydra_9.2
 EBPF_DIR = sniper-ebpf
 EBPF_EXECVE_HOOK_PROGRAM = lsm_kern.o
 EBPF_FILE_HOOK_PROGRAM = ebpf_file_kern.o
+EBPF_NET_HOOK_PROGRAM = ebpf_net_kern.o
 
 # 如果开发机禁止sh执行非白名单脚本，把sh script改为cat script | sh
 
@@ -20,6 +21,9 @@ all: ebpf user hydra
 	cp user/sniper ${DIST_DIR}
 	cp user/assist_sniper ${DIST_DIR}
 	cp sniper-ebpf/${EBPF_EXECVE_HOOK_PROGRAM} ${DIST_DIR}
+	cp sniper-ebpf/${EBPF_FILE_HOOK_PROGRAM} ${DIST_DIR}
+	cp sniper-ebpf/${EBPF_NET_HOOK_PROGRAM} ${DIST_DIR}
+
 ifeq ($(AVIRA), 1)
 	cp user/sniper_antivirus ${DIST_DIR}
 endif

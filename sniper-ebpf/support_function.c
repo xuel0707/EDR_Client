@@ -271,7 +271,7 @@ static inline int skip_current(struct parent_info *pinfo) {
 
 		pinfo->task[i].pid = task->pid;
 		pinfo->task[i].uid = bpf_get_current_uid_gid();
-		pinfo->task[i].proctime = task->start_time;
+		pinfo->task[i].proctime = task->start_boottime;
 		bpf_probe_read_kernel_str(pinfo->task[i].comm, sizeof(pinfo->task[i].comm), task->comm);
 		if (task->__state >= 32) // __state >= 32, which meaning the process is dead.
 			pinfo->task[i].did_exec = 1;
@@ -349,12 +349,39 @@ static inline int get_args_argc(const char **argv, struct taskreq_t *req) {
 	return 0;
 }
 
-static inline int get_base_info_req(struct taskreq_t *req) {
+static inline int get_base_info_taskreq(struct taskreq_t *req) {
 	struct task_struct *current = bpf_get_current_task_btf();
 
 	req->pid = bpf_get_current_pid_tgid();
 	req->tgid = bpf_get_current_pid_tgid() >> 32 ;
-	req->proctime = current->start_time;
+	req->proctime = current->start_boottime;
+	req->uid = bpf_get_current_uid_gid();
+
+	bpf_printk("pid is :%d", req->pid);
+	bpf_printk("tgid is :%d", req->tgid);
+	bpf_printk("proctime is :%d", req->proctime);
+	bpf_printk("uid is :%d", req->uid);
+
+	struct file *file0 = current->files->fd_array[0];
+	struct file *file1 = current->files->fd_array[1];
+	req->pipein = file0->f_path.dentry->d_inode->i_ino;
+	req->pipeout = file1->f_path.dentry->d_inode->i_ino;
+	bpf_printk("i_ino_0 %d", file0->f_inode->i_ino);
+	bpf_printk("i_ino_1 %d", file1->f_inode->i_ino);
+
+	req->exe_file = current->mm->exe_file;
+	req->exeino = req->exe_file->f_path.dentry->d_inode->i_ino;
+	bpf_printk("exe_ino_1 %d", file1->f_inode->i_ino);
+
+	return 0;
+}
+
+static inline int get_base_info_filereq(struct filereq_t *req) {
+	struct task_struct *current = bpf_get_current_task_btf();
+
+	req->pid = bpf_get_current_pid_tgid();
+	req->tgid = bpf_get_current_pid_tgid() >> 32 ;
+	req->proctime = current->start_boottime;
 	req->uid = bpf_get_current_uid_gid();
 
 	bpf_printk("pid is :%d", req->pid);
@@ -387,4 +414,14 @@ static inline int count_files_num(struct files_struct *files) {
 	}
 
 	return number;
+}
+
+static inline unsigned int get_mnt_id() {
+    struct task_struct *current = bpf_get_current_task_btf();
+    return current->nsproxy->mnt_ns->ns.inum;
+}
+
+static inline char *get_uts_name() {
+    struct task_struct *current = bpf_get_current_task_btf();
+    return current->nsproxy->uts_ns->name.nodename;
 }

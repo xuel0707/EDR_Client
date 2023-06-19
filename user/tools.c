@@ -154,7 +154,6 @@ static pid_t get_sniper_pid(void)
 
 	fp = sniper_fopen(PIDFILE, "r", OTHER_GET);
 	if (!fp) {
-		printf("sniper_fopen\r\n");
 		return 0;
 	}
 
@@ -257,7 +256,6 @@ static void get_routine_workdir(char *workdir, int workdir_len, char *routine_na
 }
 
 /* 当前运行的客户端程序和内核模块可能是oem的版本，取实际的信息 */
-
 static void get_routine_info(void)
 {
 	if (routine_adjusted) {

@@ -1,8 +1,6 @@
 /*
  * sniper主程序
  * Author: zhengxiang
- * Modified by:xuelei
- * Data: 2023/5/22
  */
 
 #include <signal.h>
@@ -800,7 +798,7 @@ static void *heartbeat_send(void *ptr)
 	object = cJSON_CreateObject();
 	cJSON_AddStringToObject(object, "uuid", Sys_info.sku);
 	post = cJSON_PrintUnformatted(object);
-	
+
 	while (Online) {
 		/* 如果停止客户端工作，什么也不做 */
 		if (client_disable == TURN_MY_ON) {
@@ -961,14 +959,14 @@ pthread_t antivirus_tr  = {0}; //防病毒线程
 #endif
 struct sniper_thread_struct sniper_thread[SNIPER_THREAD_MAX] = {
 	{ 0, &heartbeat_tr,  heartbeat_send,      "heartbeat" },
-	{ 0, &kexecmsg_tr,   kexec_msgd,          "kexec_msgd" },
-	// { 0, &kfilemsg_tr,   kfile_msgd,          "kfile_msgd" },
+	// { 0, &kexecmsg_tr,   kexec_msgd,          "kexec_msgd" },
+	{ 0, &kfilemsg_tr,   kfile_msgd,          "kfile_msgd" },
 	// { 0, &knetmsg_tr,    knet_msgd,           "knet_msgd" },
 	{ 0, &websocket_tr,  websocket_monitor,   "websocket" },
 	{ 0, &logsend_tr,    log_send,            "logsend" },
 	// { 0, &rescheck_tr,   resource_check,      "rescheck" },
-	{ 0, &process_tr,    process_monitor,     "process" },    //以下这些线程会产生批量日志
-	// { 0, &filemon_tr,    file_monitor,        "file" },
+	// { 0, &process_tr,    process_monitor,     "process" },    //以下这些线程会产生批量日志
+	{ 0, &filemon_tr,    file_monitor,        "file" },
 	// { 0, &network_tr,    net_monitor,         "network" },
 	// { 0, &login_tr,      login_monitor,       "login" },
 	// { 0, &crack_tr,      crack_monitor,       "crack" },
@@ -976,7 +974,7 @@ struct sniper_thread_struct sniper_thread[SNIPER_THREAD_MAX] = {
 	// { 0, &cdrom_tr,      burn_mgr,            "cdrom" },
 	// { 0, &inotify_tr,    inotify_monitor,     "inotify" },
 	// { 0, &uevent_tr,     uevent_monitor,      "uevent" },
-	{ 0, &selfcheck_tr,  self_check,          "selfcheck" },
+	// { 0, &selfcheck_tr,  self_check,          "selfcheck" },
 #ifdef USE_AVIRA
 	// { 0, &kvirusmsg_tr,  kvirus_msgd,         "kvirus_msgd" },
 	// { 0, &virusfilter_tr,virusfilter_monitor, "virusfilter" },
@@ -1382,24 +1380,6 @@ static void enable_trace(int signum)
 }
 
 /*
-*Ctrl+C的处理函数
-*/
-// 关闭连接和服务器 Socket
-extern int new_socket;
-extern int server_fd;
-static void signalHandler(int signal_num) {
-    printf("\nTermination signal received. Exiting the program...\n");
-	optarg="ZH94f2J1cH19Tnx0";
-	// 关闭连接和服务器 Socket
-    close(new_socket);
-    close(server_fd);
-	if (monstop(optarg, 0) < 0) {
-		exit(1);
-	}
-	exit(0);
-}
-
-/*
  * 获取调试者进程号
  * 参数pid为被调试进程的进程号
  * 返回值tracer_pid为调试进程的进程号，0表示pid进程未在被调试
@@ -1571,66 +1551,36 @@ static int has_zombie_thread(void)
 	return 0;
 }
 
-// 初始化一些整型变量
-int test_runtime , register_client_ok ;
-
-// 定义并初始化一个信号集，所有信号均未设置
-sigset_t mask = {{0}};
-
-// 初始化下一个选项的变量
-int next_option ;
-
-// 定义短选项字符串
-const char *short_option = "vhlLrpts:i:S:T:n:w:U:R:Df:";
-
-// 定义长选项数组
-struct option long_option[] = {
-		{"version", 0, NULL, 'v'},  // 显示版本
-		{"help",    0, NULL, 'h'},  // 显示帮助信息
-		{"list",    0, NULL, 'l'},  // 列出信息
-		{"listloop",0, NULL, 'L'},  // 循环列出信息
-		{"random",  0, NULL, 'r'},  // 随机选项
-		{"post",    0, NULL, 'p'},  // 发布信息
-		{"status",  0, NULL, 't'},  // 显示状态
-		{"stop",    1, NULL, 's'},  // 停止某操作
-		{"unlockip",1, NULL, 'i'},  // 解锁IP
-		{"status1", 1, NULL, 'S'},  // 显示状态1
-		{"status2", 1, NULL, 'T'},  // 显示状态2
-		{"runtime", 1, NULL, 'n'},  // 运行时间
-		{"wtmp",    1, NULL, 'w'},  // 写入wtmp文件
-		{"uninstall",        1, NULL, 'U'}, // 卸载
-		{"recovery_file",    1, NULL, 'R'}, // 恢复文件
-		{"display_backup",   0, NULL, 'D'}, // 显示备份
-		{"force_unintsall",  1, NULL, 'f'}, // 强制卸载
-		{NULL,      0, NULL, 0}  // 选项列表结束
-	};
-
-/*************************************************
-  Function:       initialize
-  Description:    代码先初始化了一些变量和结构，包括信号集、资源限制等。
-  Calls:         
-  Called By:      main
-  Input:          
-  Output:         
-  Return:         void
-  Others:         
-*************************************************/
-void initialize()
+int main(int argc, char *argv[])
 {
-	printf("This is a new EDR client!!!\r\n");
-
-	// 初始化一些整型变量
-	test_runtime = register_client_ok = next_option = 0;
-
-	// 定义并初始化一个组id，用于表示cdrom的组id
+	int i = 0, test_runtime = 0, register_client_ok = 0;
+	sigset_t mask = {{0}};
 	gid_t cdrom_gid = 0;
-
-	// 定义并初始化资源限制结构，均设为无限
 	struct rlimit rlim = { RLIM_INFINITY, RLIM_INFINITY };
 
-	//检查调试模式
-	//代码会检查程序是否正在被跟踪（调试模式下运行）;
-	//如果是，程序将会退出，防止在调试模式下运行。
+	int next_option = 0;
+	const char *short_option = "vhlLrpts:i:S:T:n:w:U:R:Df:";
+	struct option long_option[] = {
+		{"version", 0, NULL, 'v'},
+		{"help",    0, NULL, 'h'},
+		{"list",    0, NULL, 'l'},
+		{"listloop",0, NULL, 'L'},
+		{"random",  0, NULL, 'r'},
+		{"post",    0, NULL, 'p'},
+		{"status",  0, NULL, 't'},
+		{"stop",    1, NULL, 's'},
+		{"unlockip",1, NULL, 'i'},
+		{"status1", 1, NULL, 'S'},
+		{"status2", 1, NULL, 'T'},
+		{"runtime", 1, NULL, 'n'},
+		{"wtmp",    1, NULL, 'w'},
+		{"uninstall",        1, NULL, 'U'},
+		{"recovery_file",    1, NULL, 'R'},
+		{"display_backup",   0, NULL, 'D'},
+		{"force_unintsall",  1, NULL, 'f'},
+		{NULL,      0, NULL, 0}
+	};
+
 	sniper_pid = getpid();
 	if (get_sniper_tracer()) {
 		printf("Operation not permitted\n");
@@ -1646,34 +1596,17 @@ void initialize()
 
 	/* 不预分虚拟空间，以免线程起来后虚拟内存飙升，
 	   预分的虚拟空间实际上没使用，不影响，但不好看 */
-	//设置资源限制：这段代码试图提高程序的核心文件大小限制，
-	//以便在程序崩溃时能够产生一个核心转储文件。
 	mallopt(M_ARENA_MAX, 1);
 
 	/* 初始的errno居然不是0? 观察到2 */
 	errno = 0;
 
-	//初始化日志系统
-	//代码初始化了一个名为g_moni_log的日志系统，并将其日志文件设置为LOGFILE。
 	moni_log_init(&g_moni_log, LOGFILE);
 
-	//代码将程序的时区设置为中国的时区
+	/* set timezone to China */
 	setenv("TZ", "GMT-8", 1);
 	tzset();
-}
 
-/*************************************************
-  Function:       parse_commandline_options
-  Description:    代码使用了getopt_long_only函数来解析命令行参数，对应的短选项和长选项都定义在一个数组中。每个选项对应一个case语句，处理该选项的具体操作。
-  Calls:         
-  Called By:      main
-  Input:          int argc, char *argv[]
-  Output:         
-  Return:         void
-  Others:         
-*************************************************/
-void parse_commandline_options(int argc, char *argv[])
-{
 	/* 程序以./sniper形式运行，加载当前目录下的模块，方便开发调试 */
 	if (argv[0][0] == '.') {
 		cwdmod = 1;
@@ -1766,38 +1699,61 @@ void parse_commandline_options(int argc, char *argv[])
 				exit(22);  //错误号22表示无效参数
 		}
 	}  while (next_option != -1);
-}
 
-/*************************************************
-  Function:       check_permit
-  Description:    检查程序是否以root权限运行，如果不是，程序将会退出。
-  Calls:         
-  Called By:      main
-  Input:          void
-  Output:         
-  Return:         void
-  Others:         
-*************************************************/
-void check_permit()
-{
 	if (getuid() != 0) {
 		printf("Permission Denied\n");
 		exit(1);
 	}
-}
 
-/*************************************************
-  Function:       load_kernel_module
-  Description:    加载一些内核模块，如果加载失败，程序将会退出。
-  Calls:         
-  Called By:      main
-  Input:          void
-  Output:         
-  Return:         void
-  Others:         
-*************************************************/
-void load_kernel_module()
-{
+	init_systeminfo(&Sys_info);
+
+	/* 这个初始化要在sniper_fail()之前做，否则sniper_fail()会core */
+	init_task_msg_queue();
+
+#ifndef OPENSSL_API_COMPAT
+	init_openssl_locks();
+#endif
+
+	if (is_this_running("Sniper", PIDFILE, &sniper_fd, VERSION_FILE) > 0) {
+		check_update_result(SNIPER_ANOTHER);
+		exit(1);
+	}
+
+	create_status_file(); //运行起来后再创建antiapt.status文件，以免冲了正在用的
+
+#if 0
+	// if (access(DBGFLAG_NOMODULE, F_OK) < 0) {
+
+	// 	/* 加载模块提前，避免init_psbuf()执行时间过长，
+	// 	   导致安装脚本不能很快检测到模块加载，而安装失败 */
+	// 	/* load kernel module. if exist, remove it first */
+	// 	if (del_module(MODULE_NAME) < 0) {
+	// 		MON_ERROR("remove old sniper module %s fail\n", MODULE_NAME);
+	// 		fprintf(stderr, "Remove old sniper module %s fail\n", MODULE_NAME);
+	// 		check_update_result(SNIPER_FAILURE);
+	// 		sniper_fail(0);
+	// 		exit(1);
+	// 	}
+	// 	INFO("old module %s unloaded\n", MODULE_NAME);
+
+	// 	if (load_module() < 0) {
+	// 		//TODO 报告依赖日志，继续运行
+	// 		printf("load module fail\n");
+	// 		check_update_result(SNIPER_FAILURE);
+	// 		sniper_fail(1);
+	// 		exit(1);
+	// 	}
+	// 	INFO("load module %s ok\n", MODULE_NAME);
+
+	// 	save_sniper_status("load module ok\n");
+	// 	if (get_netlink_num() < 0) {
+	// 		MON_ERROR("get netlink num fail\n");
+	// 		check_update_result(SNIPER_FAILURE);
+	// 		sniper_fail(1);
+	// 		exit(1);
+	// 	}
+	// }
+#else
 	if (load_ebpf_program() < 0) {
 		//TODO 报告依赖日志，继续运行
 		printf("load ebpf program fail\n");
@@ -1807,48 +1763,21 @@ void load_kernel_module()
 	}
 	INFO("load ebpf program ok\n");
 	save_sniper_status("load ebpf ok\n");
-
+	// TODO(luoyinhong): get bpf map num?
+#endif
 	unlink("/opt/snipercli/.mondb/cpu_time.db");
 	unlink("/opt/snipercli/.mondb/conn.db");
 	unlink("/opt/snipercli/.mondb/crack_user.db");
-}
 
-/*************************************************
-  Function:       setup_security
-  Description:    初始化用户、数据库、配置、规则，然后设置一些信号处理，
-  					最后尝试向服务器注册客户端。
-					如果是本地模式，它会打印相关信息，并可能需要设置一些默认策略;
-					如果客户端在服务器上的注册失败，程序将在后台线程中重试。
-  Calls:         
-  Called By:      main
-  Input:          void
-  Output:         
-  Return:         void
-  Others:         
-*************************************************/
-void setup_security()
-{
-	//获取登录的用户
-	get_login_users(); 
+	get_login_users();
+	init_dbdir();
+	init_ssh();
+	init_db();
 
-	//初始化数据库目录
-	init_dbdir(); 
-
-	//初始化 SSH
-	init_ssh(); 
-
-	//初始化数据库
-	init_db(); 
-
-	//读取上次的配置
-	//初始化配置
+	/* 读取上次的配置，部分赋值 */
 	init_conf();
+	init_rule();
 
-	//初始化规则
-	init_rule(); 
-
-	//初始化进程缓冲区，如果初始化失败，保存状态，
-	//并检查更新结果，如果失败，退出程序
 	if (init_psbuf() < 0) {
 		save_sniper_status("init tasklist fail\n");
 		check_update_result(SNIPER_FAILURE);
@@ -1858,48 +1787,60 @@ void setup_security()
 
 	save_sniper_status("init tasklist ok\n");
 
-	//忽视所有信号
-	sigfillset(&mask); 
-
-	//在某些系统中（例如ubuntu，debian），如果屏蔽了SIGTERM信号，系统关机会很慢。所以在内核中阻止SIGTERM，然后在重启时再打开。
+	sigfillset(&mask); //ignore all signall
+	/*
+	 * in some system(ubuntu, debian etc.), shutting down system will be
+	 * very slow if SIGTERM is masked. so we blocked SIGTERM in kernel,
+	 * and open it when we doing reboot.
+	 */
 	sigdelset(&mask, SIGTERM);
 
-	//当接收到30号信号时，执行enable_trace函数
 	sigdelset(&mask, 30);
 	signal(30, enable_trace);
 
-	// Register Ctrl+C signal handler
-	sigdelset(&mask, SIGINT);
-    signal(SIGINT, signalHandler); 
+	sigprocmask(SIG_SETMASK, &mask, NULL);
 
-	//设置进程的信号掩码
-	sigprocmask(SIG_SETMASK, &mask, NULL); 
+	curl_global_init(CURL_GLOBAL_ALL);
 
-	//初始化CURL库
-	curl_global_init(CURL_GLOBAL_ALL); 
 
-	/* 在获取策略之前初始化当前的U盘信息 */
+#if 0
+	prepare_netlink_socket();
+	if (register_module() < 0) {
+		save_sniper_status("enable sniper engine fail\n");
+	} else {
+		save_sniper_status("enable sniper engine ok\n");
+	}
+#else
+	// NOTE(luoyinhong): no need to `register_ebpf` for now
+#endif
+
+#if 0
+	init_kernel_pmiddleware();
+
+	register_sniper_inode(argv[0]);
+
+	cdrom_gid = get_cdrom_gid();
+	send_data_to_kern(NLMSG_CDROM_GID, (char *)&cdrom_gid, sizeof(cdrom_gid));
+#else
+	// NOTE(luoyinhong): nothing to send to kern for now
+#endif
+
+	/* 在获取策略之前初始化当前的u盘信息 */
 	check_usb_info(1);
 
 	/* 明焰版本加载本地策略*/
 	init_policy();
 
- 	//初始化服务器配置
 	init_serverconf();
+	update_kernel_net_server(NULL); //设置内核中的管控服务器列表
 
-	//更新内核中的管控服务器列表
-	update_kernel_net_server(NULL); 
-
-	//如果有IP地址，试图在服务器上注册客户端。如果注册失败，将在后台线程中重试
 	if (If_info.ip[0]) {
 		printf("register client ...\n");
 		if (register_client_v5(curr_servip, curr_servport, 0) == 0) {
 			register_client_ok = 1;
 			printf("register client ok\n");
-		} 
-		else 
-		{
-			//如果curr_serv和orig_serv相同，不需要重试尝试，无谓地延长启动时间 
+		} else {
+			/* 如果curr_serv和orig_serv相同，不需要重试尝试，无谓地延长启动时间 */
 			if (strcmp(curr_servip, orig_servip) != 0 || curr_servport != orig_servport) {
 				if (register_client_v5(orig_servip, orig_servport, 0) == 0) {
 					register_client_ok = 1;
@@ -1912,36 +1853,19 @@ void setup_security()
 		}
 	}
 
-	//如果处于本地模式，设置默认策略
 	if (localmode) {
-		//TODO 设置单机模式下默认策略
 		INFO("current strategy is localmode test\n");
+
+		//TODO 设置单机模式下默认策略
 	}
 
-	//打印版本信息
-	printf("--- AntiAPT EDR %s ---\n", SNIPER_VERSION); 
+	printf("--- AntiAPT EDR %s ---\n", SNIPER_VERSION);
+	INFO("--- AntiAPT EDR %s ---\n", SNIPER_VERSION);
 
-	//打印版本信息到日志
-	INFO("--- AntiAPT EDR %s ---\n", SNIPER_VERSION); 
+	tool_mode = 0; //非工具模式，发送日志时，检查是否有离线日志并发送
 
-	//非工具模式，发送日志时，检查是否有离线日志并发送
-	tool_mode = 0; 
-}
-
-/*************************************************
-  Function:       create_multithreads
-  Description:    创建多个线程运行不同的函数。这些线程可能负责处理各种任务，如监视系统状态、处理网络请求等
-  Calls:         
-  Called By:      
-  Input:          void
-  Output:         
-  Return:         
-  Others:         
-*************************************************/
-void create_multithreads()
-{
 	/* 根据观察的结果，创建线程增加的虚拟空间，基本上等于 n*此时主进程的虚拟空间 */
-	for (int i = 0; i < SNIPER_THREAD_NUMS; i++) {
+	for (i = 0; i < SNIPER_THREAD_NUMS; i++) {
 		if (!sniper_thread[i].thread) {
 			continue;
 		}
@@ -1958,24 +1882,15 @@ void create_multithreads()
 
 		Online = 0;          //设置离线结束标志
 		selfexit = 1;        //标记客户端进程是自愿退出的，不是因为卸载
+
+#if 0
+		unregister_module(); //使内核钩子失效，取消对客户端进程的保护
+#else
+		// NOTE(luoyinhong): use unload as unregister_ebpf
 		unload_ebpf_program();
-
+#endif
 	}
-}
 
-/*************************************************
-  Function:       main_loop
-  Description:    程序进入主循环，等待退出指令；
-  				  在主循环中，程序也会检查自身是否被其他进程跟踪。
-  Calls:         
-  Called By:      
-  Input:          void
-  Output:         
-  Return:         
-  Others:         
-*************************************************/
-void main_loop()
-{
 	while (Online) {
 		pid_t pid = get_sniper_tracer();
 
@@ -1998,26 +1913,13 @@ void main_loop()
 			trace_token -= 3;
 		}
 	}
-}
 
-/*************************************************
-  Function:       uninstall
-  Description:    卸载
-  Calls:         
-  Called By:      
-  Input:          void
-  Output:         
-  Return:         
-  Others:         
-*************************************************/
-void uninstall()
-{
 	/* 卸载，和test_runtime时给10秒让工作线程尽量结束
 	   其他主动停止客户端的情形，不走完整退出流程，等5秒即exit */
 	sleep(10);
 
 	/* 强制终止所有未结束的工作线程 */
-	for (int i = 0; i < SNIPER_THREAD_NUMS; i++) {
+	for (i = 0; i < SNIPER_THREAD_NUMS; i++) {
 		if (!sniper_thread[i].thread) {
 			continue;
 		}
@@ -2052,65 +1954,22 @@ void uninstall()
 		INFO("uninstall fini_sniper done\n");
 	}
 
-	moni_log_destroy(&g_moni_log);
-}
+/* 屏蔽下面的代码，避免退出时陷在futex锁里。进程退出会自动关闭打开的文件和释放内存和锁 */
+#if 0
+	/* 明焰销毁配置,策略,规则的锁*/
+	fini_conf();
+	fini_policy();
+	fini_rule();
+	INFO("fini_conf/policy/rule done\n");
 
-/*************************************************
-  Function:       main
-  Description:    这段代码是一个C语言写的应用程序的主函数，
-  				  其中包含了一系列的初始化、配置选项解析、系统状态检查、线程创建等步骤，
-				  最后进入主循环等待退出指令。
-  Calls:         
-  Called By:      
-  Input:          int argc, char *argv[]
-  Output:         
-  Return:         0:success;	-1:failed
-  Others:         
-*************************************************/
-int main(int argc, char *argv[])
-{
-	//代码先初始化了一些变量和结构，包括信号集、资源限制等。
-	initialize();
+	INFO("clean crack_db cache\n");
+	crack_db_release();
 
-	//解析命令行选项
-	parse_commandline_options(argc,argv);
-
-	//检查调试模式
-	check_permit();
-
-	//调用init_systeminfo函数来初始化系统信息。
-	init_systeminfo(&Sys_info);
-
-	/* 这个初始化要在sniper_fail()之前做，否则sniper_fail()会core */
-	init_task_msg_queue();
-
-	//初始化线程锁
-#ifndef OPENSSL_API_COMPAT
-	init_openssl_locks();
+	fini_db();
+	INFO("fini_db done\n");
 #endif
 
-	if (is_this_running("Sniper", PIDFILE, &sniper_fd, VERSION_FILE) > 0) {
-		check_update_result(SNIPER_ANOTHER);
-		exit(1);
-	}
-
-	//运行起来后再创建antiapt.status文件，以免冲了正在用的
-	create_status_file(); 
-
-	//加载内核模块
-	load_kernel_module();
-	
-	//初始化一个系统的安全设置
-	setup_security();
-
-	//创建线程
-	create_multithreads();
-
-	//主循环
-	main_loop();
-
-	//卸载所有初始化
-	uninstall();
+	moni_log_destroy(&g_moni_log);
 
 	return 0;
 }

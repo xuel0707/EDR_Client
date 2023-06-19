@@ -56,7 +56,12 @@ static void build_virus_msg(struct file_msg_args *msg,  struct virus_msg_args *v
 #ifdef USE_AVIRA
 void *virusfilter_monitor(void *ptr)
 {
+#if 0
 	filereq_t *rep = NULL;
+#else
+	struct ebpf_filereq_t *rep = NULL;
+#endif
+
 	struct file_msg_args msg = {0};
 	kfile_msg_t *kfile_msg = NULL;
 	taskstat_t *taskstat = NULL;
@@ -104,8 +109,11 @@ void *virusfilter_monitor(void *ptr)
 			sleep(1);
 			continue;
 		}
-
+#if 0
 		rep = (filereq_t *)kfile_msg->data;
+#else
+		rep = (struct ebpf_filereq_t *)kfile_msg->data;
+#endif
 		if (rep == NULL) {
 			continue;
 		}
@@ -198,6 +206,7 @@ void *virusfilter_monitor(void *ptr)
 			put_taskstat_unlock(taskstat);
 		}
 
+#if 0
 		if (rep->did_exec) {
 			set_taskuuid(msg.taskuuid, rep->proctime, rep->pid, 0);
 		} else {
@@ -213,6 +222,7 @@ void *virusfilter_monitor(void *ptr)
 				}
 			}
 		}
+#endif
 
 		/* 队列满则丢弃所有新消息 */
 		if (virus_msg_queue_full()) {

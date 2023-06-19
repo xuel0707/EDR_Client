@@ -649,8 +649,11 @@ int check_process_filter_pro(char *process, char*md5)
 	
 	return match;
 }
-
+#if 0
 static int check_middle_binary(filereq_t *rep, struct file_msg_args *msg)
+#else 
+static int check_middle_binary(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
+#endif
 {
 	int match = 0;
 
@@ -670,8 +673,11 @@ static int check_middle_binary(filereq_t *rep, struct file_msg_args *msg)
 
 	return match;
 }
-
+#if 0
 static int check_illegal_script(filereq_t *rep, struct file_msg_args *msg, char *keyword)
+#else
+static int check_illegal_script(struct ebpf_filereq_t *rep, struct file_msg_args *msg, char *keyword)
+#endif
 {
 	int match = 0;
 
@@ -692,7 +698,11 @@ static int check_illegal_script(filereq_t *rep, struct file_msg_args *msg, char 
 	return match;
 }
 
+#if 0
 static int regex_detect(filereq_t *rep, struct file_msg_args *msg)
+#else
+static int regex_detect(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
+#endif
 {
 	int ret = 0;
 
@@ -802,7 +812,11 @@ static int get_cloudwalker_exec_value(char *path)
 }
 
 /* 用长亭的webshell引擎检测，返回值为引擎执行的得分 */
+#if 0
 static int cloudwalker_detect(filereq_t *rep, struct file_msg_args *msg, char *desc)
+#else
+static int cloudwalker_detect(struct ebpf_filereq_t *rep, struct file_msg_args *msg, char *desc)
+#endif
 {
 	int ret = 0;
 
@@ -900,7 +914,11 @@ static int get_abnormal_file_value(char *path)
 }
 
 /* 检测文件是否为异常文件(单行过长或连续相同长度的行), 返回值为检测的得分 */
+#if 0
 static int abnormal_file_detect(filereq_t *rep, struct file_msg_args *msg, char *desc)
+#else
+static int abnormal_file_detect(struct ebpf_filereq_t *rep, struct file_msg_args *msg, char *desc)
+#endif
 {
 	int ret = 0;
 
@@ -1042,8 +1060,11 @@ int upload_file_sample(struct file_msg_args *msg, char *log_name, char *log_id, 
 
 	return ret;
 }
-
+#if 0
 static void send_file_msg(filereq_t *rep, struct file_msg_args *msg)
+#else
+static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
+#endif
 {
 	cJSON *object = NULL, *arguments = NULL;
 	char uuid[S_UUIDLEN] = {0}, reply[REPLY_MAX] = {0}, *post = NULL;
@@ -1505,7 +1526,11 @@ static void send_file_msg(filereq_t *rep, struct file_msg_args *msg)
 	return;
 }
 
+#if 0
 static void black_after_post_data(filereq_t *rep, struct file_msg_args *msg)
+#else
+static void black_after_post_data(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
+#endif
 {
 	cJSON *object = NULL, *arguments = NULL;
 	char uuid[S_UUIDLEN] = {0}, reply[REPLY_MAX] = {0}, *post = NULL;
@@ -1591,7 +1616,7 @@ static void black_after_post_data(filereq_t *rep, struct file_msg_args *msg)
 	strncpy(event_category, "SensitiveBehavior", EVENT_NAME_MAX);
 	event_category[EVENT_NAME_MAX - 1] = '\0';
 
-	upload_file_sample(msg, log_name, uuid, rep->op_type, rep->md5);
+	// upload_file_sample(msg, log_name, uuid, rep->op_type, rep->md5);
 
 	extension = get_path_types(msg->pathname);
 	event_time = (msg->start_tv.tv_sec + serv_timeoff) * 1000 + (int)msg->start_tv.tv_usec / 1000;
@@ -1642,7 +1667,7 @@ static void black_after_post_data(filereq_t *rep, struct file_msg_args *msg)
         cJSON_AddStringToObject(arguments, "filepath", msg->pathname);
 	cJSON_AddNumberToObject(arguments, "size", msg->file_size);
         cJSON_AddStringToObject(arguments, "extension", extension);
-        cJSON_AddStringToObject(arguments, "md5", rep->md5);
+        // cJSON_AddStringToObject(arguments, "md5", rep->md5);
         cJSON_AddStringToObject(arguments, "new_filepath", msg->pathname_new);
         cJSON_AddNumberToObject(arguments, "operate_file_count", 1);
 	cJSON_AddStringToObject(arguments, "user", msg->username);
@@ -1687,7 +1712,11 @@ static void black_after_post_data(filereq_t *rep, struct file_msg_args *msg)
 	file_quarantine(&quarantine_msg);
 }
 
+#if 0
 int check_to_report(char *path, filereq_t *req)
+#else
+int check_to_report(char *path, struct ebpf_filereq_t *req)
+#endif
 {
 	int i = 0, found = 0, to_report = 0;
 	struct stat st = {0};
@@ -1738,7 +1767,11 @@ int check_to_report(char *path, filereq_t *req)
 
 void *file_monitor(void *ptr)
 {
+#if 0
 	filereq_t *rep = NULL;
+#else
+	struct ebpf_filereq_t *rep = NULL;
+#endif
 	struct file_msg_args msg = {0};
 	kfile_msg_t *kfile_msg = NULL;
 	struct stat sbuf = {0};
@@ -1799,15 +1832,19 @@ void *file_monitor(void *ptr)
 			sleep(1);
 			continue;
 		}
-
+#if 0
 		rep = (filereq_t *)kfile_msg->data;
+#else
+		rep = (struct ebpf_filereq_t *) kfile_msg->data;
+#endif
 		if (rep == NULL) {
 			continue;
 		}
 
 		DBG2(DBGFLAG_FILEDEBUG, "file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d\n", 
 			rep->pid, &(rep->args), &(rep->args) + rep->pro_len + 1, rep->type,rep->op_type,rep->uid);
-
+		printf("file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d\n", 
+			rep->pid, rep->comm, rep->filename , rep->type,rep->op_type,rep->uid);
 		memset(&msg, 0, sizeof(struct file_msg_args));
 		strncpy(msg.tty, rep->tty, S_TTYLEN);
 		msg.tty[S_TTYLEN-1] = 0;
@@ -1834,7 +1871,7 @@ void *file_monitor(void *ptr)
 		msg.pid = rep->pid;
 		msg.proctime = rep->proctime;
 		memcpy(&msg.start_tv, &rep->event_tv, sizeof(struct timeval));
-
+#if 0
 		if (rep->type != F_PRINTER && rep->type != F_CDROM) {
 			strncpy(msg.pathname, &rep->args + rep->pro_len + 1, rep->path_len);
 			msg.pathname[PATH_MAX-1] = 0;
@@ -1845,7 +1882,18 @@ void *file_monitor(void *ptr)
 				continue;
 			}
 		}
-
+#else
+		if (rep->type != F_PRINTER && rep->type != F_CDROM) {
+			strncpy(msg.pathname, rep->filename, 64);
+			msg.pathname[PATH_MAX-1] = 0;
+			strncpy(msg.pathname_new, rep->new_filename, 64);
+			msg.pathname_new[PATH_MAX-1] = 0;
+			if ((msg.pathname[0] == '\0') || (rep->path_len == 0)){
+//				MON_ERROR("filename is NULL\n");
+				continue;
+			}
+		}
+#endif
 		strncpy(msg.cmdname, safebasename(msg.cmd), S_CMDLEN);
 		msg.cmdname[S_CMDLEN-1] = 0;
 		strncpy(msg.p_cmdname, rep->parent_comm, S_COMMLEN);
@@ -1872,21 +1920,21 @@ void *file_monitor(void *ptr)
 			}
 		}
 
-		if (rep->did_exec) {
-			set_taskuuid(msg.taskuuid, rep->proctime, rep->pid, 0);
-		} else {
-			int i = 0;
-			struct task_simple_info *tinfo = NULL;
+		// if (rep->did_exec) {
+		// 	set_taskuuid(msg.taskuuid, rep->proctime, rep->pid, 0);
+		// } else {
+		// 	int i = 0;
+		// 	struct task_simple_info *tinfo = NULL;
 
-			for (i = 0; i < SNIPER_PGEN; i++) {
-				tinfo = &(rep->pinfo.task[i]);
-				if (tinfo->did_exec) {
-					set_taskuuid(msg.taskuuid,
-						tinfo->proctime, tinfo->pid, 0);
-					break;
-				}
-			}
-		}
+		// 	for (i = 0; i < SNIPER_PGEN; i++) {
+		// 		tinfo = &(rep->pinfo.task[i]);
+		// 		if (tinfo->did_exec) {
+		// 			set_taskuuid(msg.taskuuid,
+		// 				tinfo->proctime, tinfo->pid, 0);
+		// 			break;
+		// 		}
+		// 	}
+		// }
 
 		if (rep->type == F_CDROM) {
 			cdrom_terminate_post_data(&msg);

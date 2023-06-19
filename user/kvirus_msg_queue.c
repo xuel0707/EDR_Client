@@ -115,7 +115,11 @@ void print_droped_kvirus_msgs(void)
 }
 
 /* 转换消息内容 */
+#if 0
 static kvirus_msg_t *req2msg(filereq_t *req)
+#else
+static kvirus_msg_t *req2msg(struct ebpf_filereq_t *req)
+#endif
 {
 	kvirus_msg_t *msg = NULL;
 
@@ -152,7 +156,11 @@ static void add_kvirus_msg_queue_tail(kvirus_msg_t *msg)
 }
 
 /* push msg to queue */
+#if 0
 void kvirus_msg_queue_push(filereq_t *req)
+#else
+void kvirus_msg_queue_push(struct ebpf_filereq_t *req)
+#endif
 {
 	kvirus_msg_t *msg = NULL;
 
@@ -196,7 +204,11 @@ void *kvirus_msgd(void *ptr)
 {
 	struct nlmsghdr *nlh = NULL;
 	int reported = 0, engine_on = 0;
+#if 0
 	filereq_t *req = NULL;
+#else
+	struct ebpf_filereq_t *req = NULL;
+#endif
 
 	prctl(PR_SET_NAME, "antivirus_mq");
 	save_thread_pid("kvirus_msgd", SNIPER_THREAD_KFILTERMSG);
@@ -232,7 +244,11 @@ void *kvirus_msgd(void *ptr)
 		}
 
 		/* 获取病毒数据 */
+#if 0
 		req = (filereq_t *)get_req(nlh, NLMSG_VIRUS);
+#else
+		req = (struct ebpf_filereq_t *)get_req(nlh, NLMSG_VIRUS);
+#endif
 		if (req == NULL) {
 			continue;
 		}

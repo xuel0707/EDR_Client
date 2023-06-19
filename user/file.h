@@ -139,8 +139,11 @@ struct _print_msg{
 	char device_name[PRINTERNAME_MAX];
 	char result[RESULT_MAX];
 };
-
+#if 0
 extern int check_to_report(char *path, filereq_t *req);
+#else
+extern int check_to_report(char *path, struct ebpf_filereq_t *req);
+#endif
 
 extern int virus_msg_queue_init(void);
 extern int virus_msg_queue_full(void);

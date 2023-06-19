@@ -1,6 +1,7 @@
 TARGET := sniper-ebpf
 USER := lsm_user
-KERN := lsm_kern
+KERN := lsm_kern ebpf_file_kern ebpf_net_kern  # Fill the target kern files name in this VAR.
+KERN_C_FILES = $(foreach kern_file, $(KERN), $(kern_file).c)
 
 SRC_DIR = $(shell realpath .)
 LIBBPF_DIR = $(SRC_DIR)/libbpf
@@ -12,20 +13,22 @@ CFLAGS ?= -I$(LIBBPF_DIST_DIR)/usr/include
 LDFLAGS ?= -L$(LIBBPF_DIST_LIB_DIR)
 LIBS = -lbpf -lelf
 
-all: libbpf vmlinux.h $(TARGET) $(KERN).o
+all: libbpf vmlinux.h $(TARGET) kern.o
 
 $(TARGET): %: $(USER).c Makefile
 	gcc $(CFLAGS) $(LDFLAGS) -o $(TARGET) $(USER).c -Wl,-rpath=$(LIBBPF_DIST_LIB_DIR) $(LIBS)
 
-$(KERN).o: $(KERN).c
+kern.o: $(KERN_C_FILES)
+	for x in $(KERN); do \
 	clang -S \
 	    -target bpf \
 	    -D __BPF_TRACING__ \
 	    $(CFLAGS) \
 	    -Wall \
 	    -Werror \
-	    -O2 -emit-llvm -c -g $(KERN).c
-	llc -march=bpf -filetype=obj -o $(KERN).o $(KERN).ll
+	    -O2 -emit-llvm -c -g $$x.c; \
+	llc -march=bpf -filetype=obj -o $$x.o $$x.ll ;\
+	done
 
 vmlinux.h:
 	bpftool btf dump file /sys/kernel/btf/vmlinux format c > $@

@@ -17,27 +17,6 @@
 #define UNIX98_PTY_SLAVE_MAJOR	(UNIX98_PTY_MASTER_MAJOR+UNIX98_PTY_MAJOR_COUNT)
 
 // Define the bpf_map data structure.
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __type(key, long);
-    __type(value, long);
-    __uint(max_entries, 64);
-} socket_connect_map SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, int);
-	__type(value, struct taskreq_t);
-} heap SEC(".maps");
-
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __type(key, long);
-    __type(value, struct TestStruct);
-    __uint(max_entries, 64);
-} book_test SEC(".maps");
-
 struct file_policy_map {
     __uint(type, BPF_MAP_TYPE_HASH);
     __type(key, long);
@@ -51,31 +30,6 @@ struct {
     __uint(max_entries, 256 * 1024); /* 256 KB */
 } taskreq_ringbuf SEC(".maps");
 
-
-int check_if_print(struct kern_file_policy *sniper_fpolicy) {
-	if (!sniper_fpolicy)
-		return 0;    // If sniper fpolicy doesn't exist, We think the cupsd is allowed.
-
-	int print_on = sniper_fpolicy->printer_on;
-	int terminal = sniper_fpolicy->printer_terminate;
-	bpf_printk("printer_on is: %d, terminal is %d", print_on, terminal);
-	if (print_on && terminal){
-		return 1;
-	}
-	else{
-		return 0;
-	}
-}
-
-inline unsigned int get_mnt_id() {
-    struct task_struct *current = bpf_get_current_task_btf();
-    return current->nsproxy->mnt_ns->ns.inum;
-}
-
-inline char *get_uts_name() {
-    struct task_struct *current = bpf_get_current_task_btf();
-    return current->nsproxy->uts_ns->name.nodename;
-}
 
 // We could use commands below to get the args of the TP hook.
 // cat /sys/kernel/debug/tracing/events/syscalls/sys_enter_execve/format
@@ -93,7 +47,7 @@ int trace_enter_execve(struct sys_enter_execve_args *ctx) {
 	// __builtin_memset(req, 0, sizeof(*req)); // memset not working if the struct is too large
 
 	/* Get the essential information of the taskreq_t */
-	get_base_info_req(req);
+	get_base_info_taskreq(req);
 	/* Get the parent process info and skip sniper sub-processes*/
 	skip_current(&(req->pinfo));
 	// set ppid

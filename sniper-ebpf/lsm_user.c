@@ -4,15 +4,17 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <signal.h>
 #include "structs.h"
+#include <math.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
 
-int handle_event(void *ctx, void *data, size_t data_sz) {
+int handle_exec_event(void *ctx, void *data, size_t data_sz) {
     const struct taskreq_t *e = data;
 
     printf("EXEC process: %s(%d), nodename: %s(%u)\n", e->cmd, e->pid, e->nodename, e->mnt_id);
@@ -27,94 +29,197 @@ int handle_event(void *ctx, void *data, size_t data_sz) {
     return 0;
 }
 
+int handle_file_event(void *ctx, void *data, size_t data_sz) {
+    return 0;
+}
+
+/*
+Transform the unsigned var into the Ip Address.
+*/
+void int_to_ip(unsigned int addr, char *ip) {
+
+    memset(ip, 0, strlen(ip));
+    char buf[16] = {0};
+    int ip_1 = addr / pow(2, 24);
+    int ip_2 = addr % (int)pow(2, 24) / pow(2, 16);
+    int ip_3 = addr % (int)pow(2, 16) / pow(2, 8);
+    int ip_4 = addr % (int)pow(2, 8);
+    sprintf(buf, "%d", ip_4);
+    strcpy(ip, buf);
+    sprintf(buf, ".%d", ip_3);
+    strcat(ip, buf);
+    sprintf(buf, ".%d", ip_2);
+    strcat(ip, buf);
+    sprintf(buf, ".%d", ip_1);
+    strcat(ip, buf);
+
+}
+
+int handle_net_event(void *ctx, void *data, size_t data_sz) {
+    const struct netreq_t *e = data;
+
+    char daddr[32] = {0};
+    char saddr[32] = {0};
+    int_to_ip(e->daddr, daddr);
+    int_to_ip(e->saddr, saddr);
+
+    printf("%-15s %-6d -> %-15s %-6d\n", saddr, e->sport, daddr, e->dport);
+
+    // printf("Net daddr ip is %s\n", daddr);
+    // printf("Net saddr ip is %s\n", saddr);
+
+    return 0;
+}
+
 struct bpf_link *tp_execve_link = NULL;
+struct bpf_link *tp_file_link = NULL;
+struct bpf_link *net_link = NULL;
 
 void sig_handler(int signum) {
     int destroy_res = bpf_link__destroy(tp_execve_link);
-    printf("bpf link destroy result: %d\n", destroy_res);
+    int destroy_res_file = bpf_link__destroy(tp_file_link);
+    int destroy_res_net = bpf_link__destroy(net_link);
+
+    printf("bpf exec link destroy result: %d\n", destroy_res);
+    printf("bpf file link destroy result: %d\n", destroy_res_file);
+    printf("bpf net link destroy result: %d\n", destroy_res_net);
 
     printf("the program is over......\n");
     exit(0);
 }
 
-int main(int argc, char **argv) {
-    // int k = 0;
-    // char data_sample[CHAR_MAX] = "yeet";
-    // // put some data in the map as a test
-    // int success = bpf_map_update_elem(lsm_map_fd, &k, data_sample, BPF_ANY);
-    // printf("Success is %d for making new element in map from user space at index %d!\n", success, k);
+struct bpf_object *load_exec_program(char *exec_path) {
+    struct bpf_object *exec_obj;
+    exec_obj = bpf_object__open(exec_path);
 
+    printf("Ok! exec BPF bytecode open over......\n");
 
-    // struct bpf_map *file_policy_map = bpf_object__find_map_by_name(obj, "file_policy_map");
-    // int file_policy_map_fd = bpf_map__fd(file_policy_map);
-
-    // struct kern_file_policy sniper_fpolicy;
-    // memset(&sniper_fpolicy, 0, sizeof(sniper_fpolicy));
-    // sniper_fpolicy.printer_on = 1;
-    // sniper_fpolicy.printer_terminate = 1;
-
-    // long f_map_key = 0;
-    // int response = bpf_map_update_elem(file_policy_map_fd, &f_map_key, &sniper_fpolicy, BPF_NOEXIST);
-    // printf("Add a sniper fpolicy to the map in user-space...\n");
-
-
-    // int zero = 0;
-    // struct bpf_map *req_map = bpf_object__find_map_by_name(obj, "heap");
-    // int req_map_fd = bpf_map__fd(req_map);  // struct taskreq_t *req = NULL;
-
-    // struct TestStruct test = {0};
-    // strcpy(test.author, "CiXin");
-    // strcpy(test.title, "Earth");
-    // test.length = 66;
-    // bpf_map_update_elem(req_map_fd, &zero, &test, BPF_NOEXIST);
-
-    // printf("Press any key to continue...\n");
-    // getchar();
-
-    // The location of the bytecode file.
-    char path[PATH_MAX];
-    sprintf(path, "%s/lsm_kern.o", dirname(argv[0]));
-    printf("bytecode file path: %s\n", path);
-
-    // int prog_fd;
-
-    // Open and Load the bytecode file.
-    struct bpf_object *obj;
-    obj = bpf_object__open(path);
-    printf("Ok! BPF bytecode open over......\n");
-
-    int load_res = bpf_object__load(obj);
-    if (load_res != 0){
+    int exec_load_res = bpf_object__load(exec_obj);
+    if (exec_load_res != 0){
         printf("BPF Program loaded failed......\n");
+        return NULL;
+    }
+
+    struct bpf_program *tp_execve_prog = bpf_object__find_program_by_name(exec_obj, "trace_enter_execve");
+    tp_execve_link = bpf_program__attach(tp_execve_prog);
+    return exec_obj;
+}
+
+struct bpf_object *load_file_program(char *file_path) {
+    struct bpf_object *file_obj;
+    file_obj = bpf_object__open(file_path);
+
+    printf("Ok! file BPF bytecode open over......\n");
+
+    int file_load_res = bpf_object__load(file_obj);
+    if (file_load_res != 0){
+        printf("file BPF Program loaded failed......\n");
+        return NULL;
+    }
+
+    struct bpf_program *tp_file_prog = bpf_object__find_program_by_name(file_obj, "lsm_file_unlink");
+    tp_file_link = bpf_program__attach(tp_file_prog);
+
+    return file_obj;
+}
+
+struct bpf_object *load_net_program(char *net_path) {
+    struct bpf_object *net_obj;
+    net_obj = bpf_object__open(net_path);
+
+    printf("Ok! net BPF bytecode open over......\n");
+
+    int net_load_res = bpf_object__load(net_obj);
+    if (net_load_res != 0){
+        printf("Net BPF Program loaded failed......\n");
+        return NULL;
+    }
+
+    struct bpf_program *net_prog = bpf_object__find_program_by_name(net_obj, "tcp_connect");
+    net_link = bpf_program__attach(net_prog);
+
+    return net_obj;
+}
+
+int main(int argc, char **argv) {
+
+    // char exec_path[PATH_MAX];
+    // sprintf(exec_path, "%s/lsm_kern.o", dirname(argv[0]));
+    // struct bpf_object* exec_obj = load_exec_program(exec_path);
+    // if (!exec_obj){
+    //     return -1;
+    // }
+
+    char net_path[PATH_MAX];
+    sprintf(net_path, "%s/ebpf_net_kern.o", dirname(argv[0]));
+    struct bpf_object* net_obj = load_net_program(net_path);
+    if (!net_obj){
         return -1;
     }
-    printf("Ok! BPF Program loaded......\n");
+    // // The location of the bytecode file.
+    // char path[PATH_MAX];
+    // sprintf(path, "%s/lsm_kern.o", dirname(argv[0]));
+    // printf("bytecode file path: %s\n", path);
 
-    // Find the program been loaded into the kernel.
-    // struct bpf_program *prog =
-    //     bpf_object__find_program_by_name(obj, "lsm_demo");
-    struct bpf_program *tp_execve_prog = bpf_object__find_program_by_name(obj, "trace_enter_execve");
+    // char path_file[PATH_MAX];
+    // sprintf(path_file, "%s/ebpf_file_kern.o", dirname(argv[0]));
+    // printf("bytecode file_fileebpf path: %s\n", path_file);
 
-    // attach the program into the Hooks.
-    tp_execve_link = bpf_program__attach(tp_execve_prog);
+    // // Open and Load the bytecode file.
+    // struct bpf_object *obj;
+    // struct bpf_object *obj_file;
+    // obj = bpf_object__open(path);
+    // obj_file = bpf_object__open(path_file);
+    // printf("Ok! BPF bytecode open over......\n");
+
+    // int load_res = bpf_object__load(obj);
+    // if (load_res != 0){
+    //     printf("BPF Program loaded failed......\n");
+    //     return -1;
+    // }
+
+    // int file_load_res = bpf_object__load(obj_file);
+    // if (file_load_res != 0){
+    //     printf("f=file BPF Program loaded failed......\n");
+    //     return -1;
+    // }
+    // printf("Ok! BPF Program loaded......\n");
+
+    // // Find the program been loaded into the kernel.
+    // struct bpf_program *tp_execve_prog = bpf_object__find_program_by_name(obj, "trace_enter_execve");
+    // struct bpf_program *tp_file_prog = bpf_object__find_program_by_name(obj_file, "lsm_file_unlink");
+
+    // // attach the program into the Hooks.
+    // tp_execve_link = bpf_program__attach(tp_execve_prog);
+    // tp_file_link = bpf_program__attach(tp_file_prog);
 
     // register signal handlers
     signal(SIGINT, sig_handler);    // Ctrl + C
     signal(SIGTERM, sig_handler);
     signal(SIGTSTP, sig_handler);   // Ctrl + Z
 
-    struct bpf_map *exec_event_ringbuf_map = bpf_object__find_map_by_name(obj, "taskreq_ringbuf");
-    int ringbuf_map_fd = bpf_map__fd(exec_event_ringbuf_map);
-    struct ring_buffer *exec_event_ringbuf = NULL;
-    exec_event_ringbuf = ring_buffer__new(ringbuf_map_fd, handle_event, NULL, NULL);
+    // struct bpf_map *exec_event_ringbuf_map = bpf_object__find_map_by_name(exec_obj, "taskreq_ringbuf");
+    // int ringbuf_map_fd = bpf_map__fd(exec_event_ringbuf_map);
+    // struct ring_buffer *exec_event_ringbuf = NULL;
+    // exec_event_ringbuf = ring_buffer__new(ringbuf_map_fd, handle_exec_event, NULL, NULL);
 
-    if (!exec_event_ringbuf) {
+    // if (!exec_event_ringbuf) {
+    //     printf("Failed to create ring buffer\n");
+    //     return -1;
+    // }
+    struct bpf_map *net_event_ringbuf_map = bpf_object__find_map_by_name(net_obj, "netreq_ringbuf");
+    int net_ringbuf_map_fd = bpf_map__fd(net_event_ringbuf_map);
+    struct ring_buffer *net_event_ringbuf = NULL;
+    net_event_ringbuf = ring_buffer__new(net_ringbuf_map_fd, handle_net_event, NULL, NULL);
+
+    if (!net_event_ringbuf) {
         printf("Failed to create ring buffer\n");
         return -1;
     }
     printf("receive from ring buf...\n");
+    printf("%-15s %-6s -> %-15s %-6s\n", "Src addr", "Port", "Dest addr", "Port");
     while(1) {
-        ring_buffer__poll(exec_event_ringbuf, 100 /* timeout, ms */);
+        ring_buffer__poll(net_event_ringbuf, 100 /* timeout, ms */);
     }
 
     // struct bpf_link *lsm_link = bpf_program__attach_lsm(prog);
@@ -156,20 +261,6 @@ int main(int argc, char **argv) {
     //     printf("generation %d comm is %s\n",i, req.pinfo.task[i].comm);
     // }
 
-    // int pid = req->pid;
-    // printf("pid : %d\nuid : %d\n", req->pid, req->uid);
-
-    // Iterate over all keys in the target map.
-    // while (bpf_map_get_next_key(lsm_map_fd, &prev_key, &key) == 0) {
-    //   printf("The pid is : %ld\n", key);
-    //   bpf_map_lookup_elem(lsm_map_fd, &key, &val);
-    //   printf("The number of argument is : %ld\n", val);
-    //   prev_key = key;
-    // }
-
-
-    // int destroy_res = bpf_link__destroy(lsm_link);
-    // printf("destroy_res : %d\n", destroy_res);
 
     printf("the program is over......\n");
     return 0;
