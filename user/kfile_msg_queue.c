@@ -239,7 +239,7 @@ kfile_msg_t *get_kfile_msg(void)
 }
 
 static int handle_filereq_ringbuf_event(void *ctx, void *data, size_t data_sz) {
-    const struct ebpf_filereq_t *req = data;
+    struct ebpf_filereq_t *req = data;
 
 	if (file_msg_queue_full()) {
 		return 0;
@@ -252,9 +252,12 @@ static int handle_filereq_ringbuf_event(void *ctx, void *data, size_t data_sz) {
 // TODO: Adapt to the ebpf ringbuf....
 void *kfile_msgd(void *ptr)
 {
+#if 0
 	struct nlmsghdr *nlh = NULL;
 	int reported = 0, engine_on = 0;
 	struct ebpf_filereq_t *req = NULL;
+#else
+#endif
 
 	prctl(PR_SET_NAME, "file_mq");
 	save_thread_pid("kfile_msgd", SNIPER_THREAD_KFILEMSG);
@@ -338,10 +341,10 @@ void *kfile_msgd(void *ptr)
 	}
 
 #if 0
-        fini_engine(NLMSG_FILE, nlh);
-        if (nlh) {
-                sniper_free(nlh, NLMSGLEN, FILE_GET);
-        }
+	fini_engine(NLMSG_FILE, nlh);
+	if (nlh) {
+			sniper_free(nlh, NLMSGLEN, FILE_GET);
+	}
 #else
 #endif
         kfile_msg_queue_destroy();

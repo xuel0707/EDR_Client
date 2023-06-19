@@ -316,7 +316,7 @@ static kexec_msg_t *req2msg(taskreq_t *req)
 		return NULL;
 	}
 
-        msg = (kexec_msg_t *)sniper_malloc(sizeof(struct kexec_msg), PROCESS_GET);
+    msg = (kexec_msg_t *)sniper_malloc(sizeof(struct kexec_msg), PROCESS_GET);
 	if (!msg) {
 		MON_ERROR("malloc kexec msg fail\n");
 		return NULL;
@@ -398,7 +398,7 @@ void kexec_msg_queue_push(taskreq_t *req)
 void kexec_msg_queue_push(struct ebpf_taskreq_t *req)
 {
 	kexec_msg_t *msg = NULL;
-	int drop = 0;
+	// int drop = 0;
 
 	if (!req) {
 		return;
@@ -456,7 +456,7 @@ kexec_msg_t *get_kexec_msg(void)
 }
 
 static int handle_taskreq_ringbuf_event(void *ctx, void *data, size_t data_sz) {
-    const struct ebpf_taskreq_t *req = data;
+    struct ebpf_taskreq_t *req = data;
 
 	if (msg_queue_full()) {
 		return 0;

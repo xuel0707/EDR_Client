@@ -361,6 +361,7 @@ struct ebpf_task_simple_info {
 	unsigned long proctime; //进程创建时间，作为进程标识
 };
 
+
 struct ebpf_parent_info {
 	struct ebpf_task_simple_info task[4];
 };
@@ -439,7 +440,7 @@ struct file_request {
 	uid_t uid;
 	pid_t pid;
 	int did_exec;
-	struct parent_info pinfo;
+	struct ebpf_parent_info pinfo;
 	unsigned long proctime;
 	struct timeval event_tv;
 	unsigned short op_type;  //1:open 2:close 3:unlink 4:rename 5:symlink
@@ -461,6 +462,44 @@ struct file_request {
 	char args;
 };
 typedef struct file_request filereq_t;
+
+struct ebpf_filereq_t {
+	uid_t uid;       // The user id.
+	int tgid;      // The Thread Group id.
+	pid_t pid;       // The process id.
+	// int did_exec;  // The flag that whether a file is over.
+	struct timeval event_tv;
+	unsigned long proctime;      // the time that process started.
+	unsigned long pipein;        // The pipe used to input.
+	unsigned long pipeout;       // The pipe used to output.
+	unsigned long exeino;        // ???
+	struct file *exe_file;       // ???
+	unsigned short op_type;      // The file operation (1:open 2:close 3:unlink 4:rename 5:symlink)
+	unsigned short type;         // 1:sensitive 2:log_delete 3:safe 4:logcollector
+	unsigned short size;         // request size: head + args
+	unsigned int mode;
+	unsigned int flags;
+	unsigned int mnt_id;
+	long mtime_sec;              // The mtime of the file, unit is second.
+	long mtime_nsec;             // The mtime of the filem unit is nanosecond.
+	long long int file_size;
+	long long int newfile_size;
+	struct ebpf_parent_info pinfo;    // The parent processes information (Up to 4 generations).
+	char comm[16];
+	char parent_comm[16];
+	char filename[64];
+	unsigned int path_len;
+	char new_filename[64];
+	unsigned int newpath_len;
+	char pro_pathname[64];
+	unsigned int pro_len;
+	int terminate;               // Been Abandoned, used to Judge whether the Block is needed.
+	char tty[S_TTYLEN];
+	char nodename[S_NAMELEN+1];
+	char cmd[S_CMDLEN];
+	char cwd[S_CWDLEN];
+	char args[8][64];            // Used to store the arguments.
+};
 
 struct sniper_ip {
 	unsigned char ip[4];
@@ -515,7 +554,7 @@ struct net_request {
 	pid_t tgid;
 	char comm[S_COMMLEN];
 	unsigned short size; //包的总大小: 头+命令参数信息
-	struct parent_info pinfo;
+	struct ebpf_parent_info pinfo;
 	unsigned long exeino;
 	unsigned long proctime; //进程创建时间，作为进程标识
 	struct timeval event_tv;  //事件时间，比如进行连接的时刻
@@ -538,6 +577,16 @@ struct net_request {
 	char domain[S_DOMAIN_NAMELEN];
 };
 typedef struct net_request netreq_t;
+
+struct ebpf_netreq_t {
+	unsigned char comm[16];
+	unsigned short sport; // __u16
+	unsigned short dport; // __be16
+	unsigned int saddr;   // __be32
+	unsigned int daddr;   // __be32
+	unsigned int pid;     // __u32
+	unsigned char  containerid[32];
+};
 
 struct port_scan {
 	unsigned long effective_time; // 端口扫描超限时间

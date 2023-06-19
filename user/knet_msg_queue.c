@@ -46,7 +46,11 @@ static void knet_msg_queue_destroy(void)
 	pthread_mutex_destroy(&knet_msg_queue_lock);
 }
 
+#if 0
 static knet_msg_t *req2msg(netreq_t *req)
+#else
+static knet_msg_t *req2msg(struct ebpf_netreq_t *req)
+#endif
 {
 	knet_msg_t *msg = NULL;
 
@@ -60,14 +64,14 @@ static knet_msg_t *req2msg(netreq_t *req)
 		return NULL;
 	}
 
-	msg->datalen = req->size;
+	msg->datalen = sizeof(struct ebpf_netreq_t);
 	msg->data = sniper_malloc(msg->datalen, NETWORK_GET);
 	if (!msg->data) {
 		MON_ERROR("malloc knet msg databuf fail\n");
 		sniper_free(msg, sizeof(struct knet_msg), NETWORK_GET);
 		return NULL;
 	}
-
+	memset(msg->data, 0, msg->datalen);
 	memcpy(msg->data, req, msg->datalen);
 	msg->repeat = 0;
 
@@ -149,7 +153,11 @@ static void add_knet_msg_queue_tail(knet_msg_t *msg)
 }
 
 /* push msg to queue */
+#if 0
 void knet_msg_queue_push(netreq_t *req)
+#else
+void knet_msg_queue_push(struct ebpf_netreq_t *req)
+#endif
 {
 	knet_msg_t *msg = NULL;
 
@@ -189,21 +197,38 @@ knet_msg_t *get_knet_msg(void)
 	return msg;
 }
 
+static int handle_netreq_ringbuf_event(void *ctx, void *data, size_t data_sz) {
+    struct ebpf_netreq_t *req = data;
+
+	if (msg_queue_full()) {
+		return 0;
+	}
+	knet_msg_queue_push(req);
+    return 0;
+}
+
 #define MALLOC_FAIL 1
 #define ENGINE_FAIL 2
 #define NOTIFY_CC   4
 void *knet_msgd(void *ptr)
 {
+#if 0 
 	struct nlmsghdr *nlh = NULL;
 	int reported = 0, engine_on = 0;
 	netreq_t *req = NULL;
+#else
+#endif
 
 	prctl(PR_SET_NAME, "network_mq");
 	save_thread_pid("knet_msgd", SNIPER_THREAD_KNETMSG);
 
 	knet_msg_queue_init();
+	struct bpf_object *net_program_obj = NULL;
+	struct bpf_map *netreq_ringbuf_map = NULL;
+	struct ring_buffer *netreq_ringbuf = NULL;
 
-        while (Online) {
+    while (Online) {
+#if 0
 		/* 许可到期/停止防护/引擎关闭，这边不做处理，由接收消息的地方处理 */
 		if (!nlh) {
 			nlh = (struct nlmsghdr *)sniper_malloc(NLMSGLEN, NETWORK_GET);
@@ -242,13 +267,43 @@ void *knet_msgd(void *ptr)
 		}
 
 		knet_msg_queue_push(req);
+#else
+#endif
+
+		if (!net_program_obj) {
+			net_program_obj = get_bpf_object(EBPF_NET);
+			if (!net_program_obj) {
+				sleep(1);
+				continue;
+			}
+		}
+
+		if (!netreq_ringbuf) {
+			netreq_ringbuf_map = bpf_object__find_map_by_name(net_program_obj, "netreq_ringbuf");
+			int ringbuf_map_fd = bpf_map__fd(netreq_ringbuf_map);
+			netreq_ringbuf = ring_buffer__new(ringbuf_map_fd, handle_netreq_ringbuf_event, NULL, NULL);
+			if (!netreq_ringbuf) {
+				sleep(1);
+				continue;
+			}
+		}
+
+		int err = ring_buffer__poll(netreq_ringbuf, 100 /* timeout, ms */);
+		if (err < 0) {
+			printf("Error polling netreq_ringbuf: %d\n", err);
+		}	
+
 		print_droped_msgs();
 	}
 
+#if 0
 	fini_engine(NLMSG_NET, nlh);
 	if (nlh) {
 		sniper_free(nlh, NLMSGLEN, NETWORK_GET);
 	}
+#else
+#endif
+
 	knet_msg_queue_destroy();
 
 	INFO("knet_msgd thread exit\n");

@@ -270,6 +270,7 @@ extern time_t login_strategy_time;
 
 #define EBPF_EXECVE_HOOK_PROGRAM	"lsm_kern.o"
 #define EBPF_FILE_HOOK_PROGRAM  "ebpf_file_kern.o"
+#define EBPF_NET_HOOK_PROGRAM  "ebpf_net_kern.o"
 
 #define LOGFILE                 "/var/log/antiapt.log"
 #define LOGFILE1                "/var/log/antiapt.log.1"
@@ -633,6 +634,7 @@ extern void save_thread_time(unsigned int thread_seq);
 enum {
     EBPF_EXECVE = 0,
 	EBPF_FILE = 1,
+	EBPF_NET = 2,
     EBPF_PROGRAMS_NUM,
 };
 extern int load_ebpf_program(void);

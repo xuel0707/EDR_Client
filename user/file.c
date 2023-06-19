@@ -1835,7 +1835,7 @@ void *file_monitor(void *ptr)
 #if 0
 		rep = (filereq_t *)kfile_msg->data;
 #else
-		rep = (struct ebpf_filereq_t *) kfile_msg->data;
+		rep = (struct ebpf_filereq_t *)kfile_msg->data;
 #endif
 		if (rep == NULL) {
 			continue;

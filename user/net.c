@@ -1084,19 +1084,47 @@ static void report_illegal_connection(netreq_t *req)
 }
 #endif
 
+static void int_to_ip(unsigned int addr, char *ip) {
+
+    memset(ip, 0, strlen(ip));
+    char buf[16] = {0};
+    int ip_1 = addr / pow(2, 24);
+    int ip_2 = addr % (int)pow(2, 24) / pow(2, 16);
+    int ip_3 = addr % (int)pow(2, 16) / pow(2, 8);
+    int ip_4 = addr % (int)pow(2, 8);
+    sprintf(buf, "%d", ip_4);
+    strcpy(ip, buf);
+    sprintf(buf, ".%d", ip_3);
+    strcat(ip, buf);
+    sprintf(buf, ".%d", ip_2);
+    strcat(ip, buf);
+    sprintf(buf, ".%d", ip_1);
+    strcat(ip, buf);
+
+}
+
 /* net net monitor thread */
 void *net_monitor(void *ptr)
 {
+#if 0
 	netreq_t *req = NULL;
+#else
+	struct ebpf_netreq_t *req = NULL;
+#endif
 	knet_msg_t *net_msg = NULL;
 	time_t last_internet_check_time = time(NULL);
+    char daddr[32] = {0};
+    char saddr[32] = {0};
 
 	prctl(PR_SET_NAME, "network_monitor");
 	save_thread_pid("network", SNIPER_THREAD_NETWORK);
 
 	check_lockedip(1);
 
+    printf("%-15s %-6s -> %-15s %-6s\n", "Src addr", "Port", "Dest addr", "Port");
+
 	while (Online) {
+
 		if (net_msg) {
 			sniper_free(net_msg->data, net_msg->datalen, NETWORK_GET);
 			sniper_free(net_msg, sizeof(struct knet_msg), NETWORK_GET);
@@ -1183,16 +1211,24 @@ void *net_monitor(void *ptr)
 			}
 		}
 #endif
+
 		net_msg = (knet_msg_t *)get_knet_msg();
 		if (!net_msg) {
 			sleep(1);
 			continue;
 		}
-
+#if 0
 		req = (netreq_t *)net_msg->data;
+#else
+		req = (struct ebpf_netreq_t *)net_msg->data;
+#endif
 		if (!req) {
 			continue;
 		}
+		int_to_ip(req->daddr, daddr);
+		int_to_ip(req->saddr, saddr);
+		printf("%-15s %-6d -> %-15s %-6d\n", saddr, req->sport, daddr, req->dport);
+
 #if 0
 		if (req->flags.unlockip) {
 			send_unlockip_msg(req->ip, OPERATE_OK);
