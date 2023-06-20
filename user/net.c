@@ -1084,6 +1084,12 @@ static void report_illegal_connection(netreq_t *req)
 }
 #endif
 
+/*
+Turn the __u32 ipv4 address into Decimal ipv4 address.
+@Args:
+addr : __u32 ipv4 address.
+ip   : Decimal ipv4 address.
+*/
 static void int_to_ip(unsigned int addr, char *ip) {
 
     memset(ip, 0, strlen(ip));
