@@ -371,7 +371,7 @@ struct ebpf_taskreq_t {
 	int pid;       // The process id.
 	int ppid;      // parent process id
 	unsigned int euid;      // effective user id.
-	int tgid;      // Thread Group id.
+	int tgid;      // Thread Group id.buf
 	unsigned long proctime;      // the time that process started.
 	unsigned long pipein;        // The pipe used to input.
 	unsigned long pipeout;       // The pipe used to output.

@@ -959,15 +959,15 @@ pthread_t antivirus_tr  = {0}; //防病毒线程
 #endif
 struct sniper_thread_struct sniper_thread[SNIPER_THREAD_MAX] = {
 	{ 0, &heartbeat_tr,  heartbeat_send,      "heartbeat" },
-	// { 0, &kexecmsg_tr,   kexec_msgd,          "kexec_msgd" },
-	// { 0, &kfilemsg_tr,   kfile_msgd,          "kfile_msgd" },
-	{ 0, &knetmsg_tr,    knet_msgd,           "knet_msgd" },
+	{ 0, &kexecmsg_tr,   kexec_msgd,          "kexec_msgd" },
+	{ 0, &kfilemsg_tr,   kfile_msgd,          "kfile_msgd" },
+	// { 0, &knetmsg_tr,    knet_msgd,           "knet_msgd" },
 	{ 0, &websocket_tr,  websocket_monitor,   "websocket" },
 	{ 0, &logsend_tr,    log_send,            "logsend" },
 	// { 0, &rescheck_tr,   resource_check,      "rescheck" },
-	// { 0, &process_tr,    process_monitor,     "process" },    //以下这些线程会产生批量日志
-	// { 0, &filemon_tr,    file_monitor,        "file" },
-	{ 0, &network_tr,    net_monitor,         "network" },
+	{ 0, &process_tr,    process_monitor,     "process" },    //以下这些线程会产生批量日志
+	{ 0, &filemon_tr,    file_monitor,        "file" },
+	// { 0, &network_tr,    net_monitor,         "network" },
 	// { 0, &login_tr,      login_monitor,       "login" },
 	// { 0, &crack_tr,      crack_monitor,       "crack" },
 	// { 0, &task_tr,       task_monitor,        "task" },

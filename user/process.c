@@ -877,12 +877,12 @@ static void send_process_msg(proc_msg_t *msg, taskstat_t *taskstat, int debug)
 
 
 	/* 这里总按批量日志发，若为单发日志模式，client_send_msg会自动按单条日志发 */
-#if 0
-	client_send_msg(post, reply, sizeof(reply), LOG_URL, "process");
+#if 1
+	client_send_msg(post, reply, sizeof(reply), SINGLE_LOG_URL, "process");
 #else
-	// TODO(luoyinhong)
-	printf("client send msg: %s\n", post);
 #endif
+	// TODO(luoyinhong)
+	// printf("client send msg: %s\n", post);
 
 	/* 没有发送过的进程日志，不报进程退出日志 */
 	if (taskstat) {
@@ -1598,7 +1598,7 @@ static void check_privup(taskstat_t *taskstat, int exec)
 	if (taskstat->pid < RESERVED_PIDS) { //300以下的进程都是root
 		return;
 	}
-
+	printf("Check Privup Point .... UID is %d, EUID is %d\n", taskstat->uid, taskstat->euid);
 	/* 目前仅做uid检查 */
 	if (taskstat->uid && taskstat->euid) {
 		return;
@@ -1650,6 +1650,7 @@ static void check_privup(taskstat_t *taskstat, int exec)
 			return;
 		}
 
+		printf("CMD is %s\n", cmd);
 		if (stat(cmd, &cmdst) < 0) {
 			MON_ERROR("check_privup stat %s fail: %s"
 				  "%s(%d) exec %s(%d)\n",
@@ -3982,6 +3983,10 @@ void *process_monitor(void *ptr)
 		// taskstat->flags = 0;
 #endif
 
+		if (is_port_forward(taskstat, 0)) {
+			taskstat->flags |= TASK_PORT_FORWARD;
+		}
+
 #if 0
 		if (req->pflags.docker) {
 			taskstat->flags |= TASK_DOCKER;
@@ -4058,6 +4063,9 @@ void *process_monitor(void *ptr)
 			printf("chopper taskstat %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
 		}
 #endif
+		set_taskstat_flags(taskstat, the_ptaskstat(taskstat));
+
+		check_privup_exec(taskstat);
 
 #if 0
 		//TODO 先过滤。check_privup_exec合并到report_process里？

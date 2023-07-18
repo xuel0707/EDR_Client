@@ -1518,18 +1518,19 @@ static int in_unexec_dirs(char *cmd, char *cwd)
 
 	//TODO 1、把cwd和cmd拼接起来。2、检查cmd的目录是否任意人可读写
 	if (cmd[0] == '/') {
-                if (strncmp(cmd, "/tmp/", 5) == 0 ||
-                    strncmp(cmd, "/var/log/", 9) == 0 ||
-                    strncmp(cmd, "/var/tmp/", 9) == 0) {
-                        return 1;
-                }
-	} else {
-                if (is_dir(cwd, "/tmp", 4) ||
-                    is_dir(cwd, "/var/log", 8) ||
-                    is_dir(cwd, "/var/tmp", 8)) {
-                        return 1;
-                }
+		if (strncmp(cmd, "/tmp/", 5) == 0 ||
+			strncmp(cmd, "/var/log/", 9) == 0 ||
+			strncmp(cmd, "/var/tmp/", 9) == 0) {
+				return 1;
+		}
 	}
+	//  else {
+		if (is_dir(cwd, "/tmp", 4) ||
+			is_dir(cwd, "/var/log", 8) ||
+			is_dir(cwd, "/var/tmp", 8)) {
+				return 1;
+		}
+	// }
 
 	return 0;
 }
@@ -1537,13 +1538,21 @@ static int in_unexec_dirs(char *cmd, char *cwd)
 /* 检测是否异常命令。返回0，正常；1，异常 */
 static int is_abnormal(taskstat_t *taskstat)
 {
+#if 0
 	if (!prule.abnormal_on || !taskstat || taskstat->flags & TASK_DOCKER) {
 		return 0;
 	}
 	if (taskstat->pid < RESERVED_PIDS) {
 		return 0;
 	}
-
+#else
+	if (!taskstat || taskstat->flags & TASK_DOCKER) {
+		return 0;
+	}
+	if (taskstat->pid < RESERVED_PIDS) {
+		return 0;
+	}
+#endif
 	/* 异常：在特殊目录下的命令 */
 	if (in_unexec_dirs(taskstat->cmd, taskstat->cwd)) {
 		return 1;
@@ -1938,7 +1947,6 @@ void set_taskstat_flags(taskstat_t *taskstat, taskstat_t *ptaskstat)
 		taskstat->flags |= TASK_DANGER;
 		return;
 	}
-
 	if (is_abnormal(taskstat)) {
 		taskstat->flags |= TASK_ABNORMAL;
 		return;

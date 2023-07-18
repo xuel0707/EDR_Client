@@ -898,23 +898,23 @@ int nametouid(uid_t *uid, char *name)
 
 char *safebasename(char *path)
 {
-        char *baseptr = NULL;
+	char *baseptr = NULL;
 
-        if (path == NULL) {
-                return nullstr;
-        }
+	if (path == NULL) {
+			return nullstr;
+	}
 
 	/* 不是以/或.开头的，basename即path，如events/0核心线程 */
 	if (path[0] != '/' && path[0] != '.') {
 		return path;
 	}
 
-        baseptr = strrchr(path, '/');
-        if (baseptr) {
-                return baseptr+1;
-        }
+	baseptr = strrchr(path, '/');
+	if (baseptr) {
+		return baseptr+1;
+	}
 
-        return path;
+	return path;
 }
 
 void safedirname(char *path, char *dirname, int dirlen)

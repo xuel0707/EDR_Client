@@ -122,6 +122,7 @@ int client_send_msg(char *post, char *reply, int reply_len, char *url, char *log
 	 * 再把client_send_msg定义和实现的地方加上reply_len参数
 	 */
 
+	printf("post %s msg : %s\n", logtype, post);
 	if (!post || !reply || !url || !logtype) {
 		MON_ERROR("client_send_msg: null argument: "
 			  "post %p, reply %p, url %p, logtype %p\n", post, reply, url, logtype);
@@ -132,6 +133,7 @@ int client_send_msg(char *post, char *reply, int reply_len, char *url, char *log
 	if (conf_global.log_collect_mode == SINGLE_LOG_MODE && strcmp(url, LOG_URL) == 0) {
 		url = SINGLE_LOG_URL;
 	}
+	printf("post URL is %s3333333333333333333\n", url);
 
 	/* 批量发送存入本地 */
 	if (strcmp(url, LOG_URL) == 0) {
@@ -139,14 +141,17 @@ int client_send_msg(char *post, char *reply, int reply_len, char *url, char *log
 		return 0;
 	}
 
+	printf("post URL is %s4444444444444444444444\n", url);
 	/* 剩下的都是需要即使通信的, 失败再存入本地 */
 	if (http_post(url, post, reply, reply_len) <= 0) {
+		printf("send msg to %s fail\n", url);
 		if (client_registered && !Heartbeat_fail) { //已知与管控通信异常时不打印
 			MON_ERROR("send msg to %s fail\n", url);
 		}
 		store_local_log(post, logtype);
 		return -1;
 	}
+	printf("post URL is %s55555555555555555555555\n", url);
 
 	return 0;
 }

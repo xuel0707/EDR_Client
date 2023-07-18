@@ -297,9 +297,14 @@ int is_port_forward(taskstat_t *taskstat, int to_report_task_exit)
 {
 	char *cmd = NULL, *cmdline = NULL, *cmdname = NULL;
 
+#if 0
 	if (!prule.port_forward_on || !taskstat) {
 		return 0;
 	}
+#else
+	if (!taskstat)
+		return 0;
+#endif
 
 	cmd = taskstat->cmd;
 	cmdline = taskstat->args;

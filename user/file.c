@@ -1496,8 +1496,8 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 
 	post = cJSON_PrintUnformatted(object);
 	DBG2(DBGFLAG_FILE, "file post:%s\n", post);
-//	printf("file post:%s\n", post);
-	client_send_msg(post, reply, sizeof(reply), LOG_URL, "file");
+	// printf("file post:%s\n", post);
+	client_send_msg(post, reply, sizeof(reply), SINGLE_LOG_URL, "file");
 
 	cJSON_Delete(object);
 	free(post);
@@ -1843,8 +1843,8 @@ void *file_monitor(void *ptr)
 
 		DBG2(DBGFLAG_FILEDEBUG, "file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d\n", 
 			rep->pid, &(rep->args), &(rep->args) + rep->pro_len + 1, rep->type,rep->op_type,rep->uid);
-		printf("file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d\n", 
-			rep->pid, rep->comm, rep->filename , rep->type,rep->op_type,rep->uid);
+		printf("file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d, rep->path_len:%d\n", 
+			rep->pid, rep->comm, rep->filename , rep->type,rep->op_type,rep->uid, rep->path_len);
 		memset(&msg, 0, sizeof(struct file_msg_args));
 		strncpy(msg.tty, rep->tty, S_TTYLEN);
 		msg.tty[S_TTYLEN-1] = 0;
@@ -1870,7 +1870,11 @@ void *file_monitor(void *ptr)
 
 		msg.pid = rep->pid;
 		msg.proctime = rep->proctime;
+#if 0
 		memcpy(&msg.start_tv, &rep->event_tv, sizeof(struct timeval));
+#else
+		gettimeofday(&msg.start_tv, NULL);
+#endif
 #if 0
 		if (rep->type != F_PRINTER && rep->type != F_CDROM) {
 			strncpy(msg.pathname, &rep->args + rep->pro_len + 1, rep->path_len);
@@ -1889,7 +1893,8 @@ void *file_monitor(void *ptr)
 			strncpy(msg.pathname_new, rep->new_filename, 64);
 			msg.pathname_new[PATH_MAX-1] = 0;
 			if ((msg.pathname[0] == '\0') || (rep->path_len == 0)){
-//				MON_ERROR("filename is NULL\n");
+				printf("filename is NULL\n");
+				MON_ERROR("filename is NULL\n");
 				continue;
 			}
 		}

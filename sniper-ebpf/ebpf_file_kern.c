@@ -246,7 +246,7 @@ int BPF_PROG(lsm_file_open, struct file *file, int ret) {
 
 	bpf_probe_read_kernel_str(req->comm, sizeof(req->comm), current->comm);
 	bpf_probe_read_kernel_str(req->parent_comm, sizeof(req->parent_comm), current->real_parent->comm);
-	bpf_d_path(&(file->f_path), req->filename, sizeof(req->filename));
+	req->path_len = bpf_d_path(&(file->f_path), req->filename, sizeof(req->filename));
 	req->mode = file->f_mode;
 	req->flags = file->f_flags;
 	// bpf_printk("current file flags is %d", file->f_flags);
