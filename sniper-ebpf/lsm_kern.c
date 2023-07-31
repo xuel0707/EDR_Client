@@ -44,8 +44,7 @@ int trace_enter_execve(struct sys_enter_execve_args *ctx) {
 	if (!req)
 		return 0;
 
-	// __builtin_memset(req, 0, sizeof(*req)); // memset not working if the struct is too large
-
+	bpf_probe_read_str(req->comm, sizeof(req->comm), current->comm);
 	/* Get the essential information of the taskreq_t */
 	get_base_info_taskreq(req);
 	/* Get the parent process info and skip sniper sub-processes*/

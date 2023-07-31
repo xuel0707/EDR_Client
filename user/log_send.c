@@ -133,7 +133,6 @@ int client_send_msg(char *post, char *reply, int reply_len, char *url, char *log
 	if (conf_global.log_collect_mode == SINGLE_LOG_MODE && strcmp(url, LOG_URL) == 0) {
 		url = SINGLE_LOG_URL;
 	}
-	printf("post URL is %s3333333333333333333\n", url);
 
 	/* 批量发送存入本地 */
 	if (strcmp(url, LOG_URL) == 0) {
@@ -141,7 +140,6 @@ int client_send_msg(char *post, char *reply, int reply_len, char *url, char *log
 		return 0;
 	}
 
-	printf("post URL is %s4444444444444444444444\n", url);
 	/* 剩下的都是需要即使通信的, 失败再存入本地 */
 	if (http_post(url, post, reply, reply_len) <= 0) {
 		printf("send msg to %s fail\n", url);

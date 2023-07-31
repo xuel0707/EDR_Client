@@ -196,8 +196,6 @@ int BPF_PROG(lsm_file_ioctl, struct file *file, unsigned int cmd, unsigned long 
 	bpf_ringbuf_submit(req, 0);
 
 	return ret;
-
-	return ret;
 }
 
 int string_ope(char *str_1) {
@@ -221,18 +219,16 @@ int BPF_PROG(lsm_inode_permission, struct inode *inode, int mask, int ret) {
 SEC("lsm/file_open")
 int BPF_PROG(lsm_file_open, struct file *file, int ret) {
 
-	// bpf_printk("I'm in LSM file_open Hook...");
-
-	if ((file->f_flags & 01) != 01)   // 
-		return 0;
+	// if ((file->f_flags & 01) != 01)   // 
+	// 	return 0;
 	struct task_struct *current = bpf_get_current_task_btf();
 	struct filereq_t *req = bpf_ringbuf_reserve(&filereq_ringbuf, sizeof(*req), 0);
 	if (!req)
-		return -1;
+		return 0;
 
 	bpf_printk("comm is %s", current->comm);
 	get_base_info_filereq(req);
-	// skip_current(&(req->pinfo));
+	skip_current(&(req->pinfo));
 
 	req->op_type = 1;    // In the open hook, the type is "1", representing the "open operation".
 

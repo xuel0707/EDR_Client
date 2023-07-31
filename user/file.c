@@ -1164,6 +1164,7 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 
 	/* 匹配webshell文件检测 */
 	if (rep->type == F_WEBSHELL_DETECT) {
+		printf("Debug 11111111111111111111111111111\n");
 
 		/* 
 		 * 严格检测必须要匹配webshell引擎(哈希，统计，机器学习其中一个),
@@ -1185,11 +1186,17 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 
 		/* webshell引擎 */
 		cloudwalker_result = cloudwalker_detect(rep, msg, cloudwalker_desc);
+		printf("Debug 222222222222222222222222222222\n");
+		cloudwalker_result = 2;
 		/* webshell引擎的正则命中为1，不检测引擎的webshell */
 		if (cloudwalker_result <= 1) {
+			printf("Debug 333333333333333333333333333\n");
+
 			/* 异常文件检测 */
 			abnormal_result = abnormal_file_detect(rep, msg, abnormal_desc);
 			if (abnormal_result < 1) {
+				printf("Debug 4444444444444444444444444\n");
+
 				/* 正则规则匹配 */
 				regex_revel = regex_detect(rep, msg);
 				if (webshell_detect_mode == WEBSHELL_HARD_MOD) {
@@ -1383,6 +1390,7 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 			break;
 
 		case F_WEBSHELL_DETECT:
+			printf("Debug 2222222222222222222222222222\n");
 			strncpy(log_name, "Webshell_detect", LOG_NAME_MAX);
 			strncpy(event_category, "SensitiveBehavior", EVENT_NAME_MAX);
 			/* 可信规则下日志只报普通日志 */
@@ -1417,6 +1425,8 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 				terminate = MY_HANDLE_WARNING;
 			}
 			behavior = MY_BEHAVIOR_ABNORMAL;
+			event = true;
+			level = MY_LOG_HIGH_RISK;
 			break;
 
 		default:
@@ -1765,6 +1775,15 @@ int check_to_report(char *path, struct ebpf_filereq_t *req)
 	return 1;
 }
 
+int check_webshell(struct ebpf_filereq_t *req) {
+	if(!strstr(req->filename, "php"))
+		return 0;
+	else {
+		req->type = F_WEBSHELL_DETECT;
+		return 1;
+	}
+}
+
 void *file_monitor(void *ptr)
 {
 #if 0
@@ -1840,6 +1859,21 @@ void *file_monitor(void *ptr)
 		if (rep == NULL) {
 			continue;
 		}
+
+		/* 忽略定时任务sniper_chk,assist_sniper_chk及子任务 */
+		if (strcmp(rep->comm, "sniper_chk") == 0 ||
+			strcmp(rep->comm, "assist_sniper_chk") == 0 ||
+			strcmp(rep->comm, "webshell_detector") == 0 ) {
+			continue;
+		}
+		for (int i=0;i<4;i++) {
+			if (strcmp(rep->pinfo.task[i].comm, "sniper_chk") == 0 ||
+				strcmp(rep->pinfo.task[i].comm, "assist_sniper_chk") == 0) {
+				continue;
+			}
+		}
+
+		check_webshell(rep);
 
 		DBG2(DBGFLAG_FILEDEBUG, "file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d\n", 
 			rep->pid, &(rep->args), &(rep->args) + rep->pro_len + 1, rep->type,rep->op_type,rep->uid);

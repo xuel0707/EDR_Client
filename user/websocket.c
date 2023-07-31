@@ -721,12 +721,14 @@ void *websocket_monitor(void *ptr)
 		connect_num++;
 		if (fd < 0) {
 			DBG2(DBGFLAG_WEBSOCKET, "第(%d)次连接, 连接失败 %s:%d path:%s\n", connect_num, ws_ip, ws_port, ws_path);
+			printf("The(%d)connection, connection failed %s:%d path:%s\n", connect_num, ws_ip, ws_port, ws_path);
 			sleep(3);
 			continue;
 		}
 		check_ip_change(fd);
 		websocket_heartbeat = 1;
 		DBG2(DBGFLAG_WEBSOCKET, "第(%d)次连接, 连接成功\n", connect_num);
+		printf("The(%d)th connection, connection success\n", connect_num);
 
 		INFO("websocket connect %s:%d success, path:%s\n", ws_ip, ws_port, ws_path);
 
@@ -735,7 +737,7 @@ void *websocket_monitor(void *ptr)
 		send_num++;
 		if (ret <= 0) {
 			MON_ERROR("websocket 发送心跳失败\n");
-			DBG2(DBGFLAG_WEBSOCKET, "第(%d)次发送心跳, 发送失败, ret:%d\n", send_num, ret);
+			DBG2(DBGFLAG_WEBSOCKET, "The(%d)th次发送心跳, 发送失败, ret:%d\n", send_num, ret);
 			sleep(1);
 			continue;
 		}
@@ -756,6 +758,7 @@ void *websocket_monitor(void *ptr)
 			if (ret > 0 && pkg_type == WDT_TXTDATA) {
 				recv_num++;
 				DBG2(DBGFLAG_WEBSOCKET, "第(%d)次接收数据, Websocket recv data:%s\n", recv_num, recv_buff);
+				printf("The(%d)th recieve data, Websocket recv data:%s\n", recv_num, recv_buff);
 				http_post_mq(recv_buff, task_msg_queue);
 				recv_flag = 1;
 			}

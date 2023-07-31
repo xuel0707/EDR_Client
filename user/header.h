@@ -784,6 +784,7 @@ extern taskstat_t *the_ptaskstat(taskstat_t *taskstat);
 extern int is_danger(taskstat_t *taskstat);
 extern int is_danger_cmd(char *cmd);
 extern int is_chopper_cmd(char *cmd);
+extern int is_abnormal(taskstat_t *taskstat);
 
 #if 0
 extern taskstat_t *get_ptaskstat_from_pinfo(struct parent_info *pinfo);

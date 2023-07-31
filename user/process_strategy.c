@@ -540,6 +540,7 @@ void close_kernel_process_rules(void)
 /* 更新内核模块的进程监控策略。调用者负责加进程策略写锁 */
 void update_kernel_process_rules(void)
 {
+	printf("Start to Update the kernel Rule...\n");
 	int enable = 0, terminate = 0, locking = 0, locking_time = 0;
 	int size = sizeof(struct kern_process_rules);
 	struct kern_process_rules new_prule = {0};

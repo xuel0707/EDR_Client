@@ -384,6 +384,7 @@ struct ebpf_taskreq_t {
 	unsigned int mnt_id;
 	struct ebpf_parent_info pinfo;    // The parent processes information (Up to 4 generations).
 	struct file *exe_file;       // ???
+	char comm[16];
 	char tty[S_TTYLEN];
 	char nodename[S_NAMELEN+1];
 	char cmd[S_CMDLEN];

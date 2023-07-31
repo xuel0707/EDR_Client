@@ -3513,6 +3513,8 @@ static void report_black(taskstat_t *taskstat)
 /* 检测当前进程命中的事件，及根据当前最新策略进行处理。目前只针对端口转发、反弹shell、黑名单 */
 static void check_process_event(void)
 {
+	printf("One Minute Pass!!! Let's check process events.....\n");
+	
 	int ret = 0;
 	DIR *procdirp = NULL;
 	struct dirent *pident = NULL;
@@ -3891,7 +3893,18 @@ void *process_monitor(void *ptr)
 		if (!req) {
 			continue;
 		}
-
+		/* 忽略定时任务sniper_chk,assist_sniper_chk及子任务 */
+		if (strcmp(req->comm, "sniper_chk") == 0 ||
+			strcmp(req->comm, "assist_sniper_chk") == 0 ||
+			strcmp(req->comm, "webshell_detector") == 0 ) {
+			continue;
+		}
+		for (int i=0;i<4;i++) {
+			if (strcmp(req->pinfo.task[i].comm, "sniper_chk") == 0 ||
+				strcmp(req->pinfo.task[i].comm, "assist_sniper_chk") == 0) {
+				continue;
+			}
+		}
 #if 0
 		// ppid = req->pinfo.task[0].pid;
 		// ptaskstat = get_taskstat_nolock(ppid, PROCESS_GET);
@@ -3983,10 +3996,6 @@ void *process_monitor(void *ptr)
 		// taskstat->flags = 0;
 #endif
 
-		if (is_port_forward(taskstat, 0)) {
-			taskstat->flags |= TASK_PORT_FORWARD;
-		}
-
 #if 0
 		if (req->pflags.docker) {
 			taskstat->flags |= TASK_DOCKER;
@@ -4054,6 +4063,10 @@ void *process_monitor(void *ptr)
 			taskstat->flags &= ~TASK_DROP;
 		}
 #else
+		if (is_port_forward(taskstat, 0)) {
+			taskstat->flags |= TASK_PORT_FORWARD;
+		}
+
 		if (is_danger_cmd(taskstat->args)) {
 			taskstat->flags |= TASK_DANGER;
 			printf("danger taskstat %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
@@ -4061,6 +4074,27 @@ void *process_monitor(void *ptr)
 		if (is_chopper_cmd(taskstat->args)) {
 			taskstat->flags |= TASK_WEBSHELL;
 			printf("chopper taskstat %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
+		}
+		// if (is_abnormal(taskstat)) {
+		// 	taskstat->flags |= TASK_ABNORMAL;
+		// }
+		/* 异常的shell：带终端、存在的、属主是不可登录的用户 */
+		if (prule.abnormal_on && taskstat->pflags.shell && taskstat->tty[0] &&
+		    taskstat->stop_tv.tv_sec == 0 && !(taskstat->flags & TASK_REMOTE_EXECUTE)) {
+			INFO("%s(%d, %s) is a shell, user %s/%d, tty %s\n",
+			     taskstat->cmd, taskstat->pid, taskstat->args,
+			     taskstat->user, taskstat->uid, taskstat->tty);
+			printf("%s(%d, %s) is a shell, user %s/%d, tty %s\n",
+			     taskstat->cmd, taskstat->pid, taskstat->args,
+			     taskstat->user, taskstat->uid, taskstat->tty);
+			if (!can_login(taskstat->uid)) {
+				INFO("%s(%d) user(%s/%d) cannot login, is an abnormal shell\n",
+				     taskstat->args, taskstat->pid, taskstat->user, taskstat->uid);
+				printf("%s(%d) user(%s/%d) cannot login, is an abnormal shell\n",
+				     taskstat->args, taskstat->pid, taskstat->user, taskstat->uid);
+				taskstat->flags |= TASK_ABNORMAL;
+				taskstat->pflags.shell_nologinuser = 1;
+			}
 		}
 #endif
 		set_taskstat_flags(taskstat, the_ptaskstat(taskstat));

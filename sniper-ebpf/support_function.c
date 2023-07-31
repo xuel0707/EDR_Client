@@ -245,8 +245,8 @@ static inline int skip_current(struct parent_info *pinfo) {
 	task = bpf_get_current_task_btf();
 	int pid = task->pid; // pid is the current process id
 
-	char temp[CHAR_MAX] = {0};
-	bpf_probe_read_kernel_str(temp, sizeof(temp), task->comm);
+	// char temp[CHAR_MAX] = {0};
+	// bpf_probe_read_kernel_str(temp, sizeof(temp), task->comm);
 
 	// if (my_strcmp(temp, "sniper_chk") == 0)
 	// 	return 1;
@@ -273,10 +273,10 @@ static inline int skip_current(struct parent_info *pinfo) {
 		pinfo->task[i].uid = bpf_get_current_uid_gid();
 		pinfo->task[i].proctime = task->start_boottime;
 		bpf_probe_read_kernel_str(pinfo->task[i].comm, sizeof(pinfo->task[i].comm), task->comm);
-		if (task->__state >= 32) // __state >= 32, which meaning the process is dead.
-			pinfo->task[i].did_exec = 1;
-		else
-			pinfo->task[i].did_exec = 0;
+		// if (task->__state >= 32) // __state >= 32, which meaning the process is dead.
+		// 	pinfo->task[i].did_exec = 1;
+		// else
+		// 	pinfo->task[i].did_exec = 0;
 
 
 		parent = task->real_parent;
@@ -284,7 +284,7 @@ static inline int skip_current(struct parent_info *pinfo) {
 		if (!parent)
 			return 0;
 
-		bpf_probe_read_kernel_str(temp, sizeof(temp), parent->comm);
+		// bpf_probe_read_kernel_str(temp, sizeof(temp), parent->comm);
 
 		// if (my_strcmp(temp, "sniper_chk") == 0)
 		// 	return 1;
@@ -384,6 +384,7 @@ static inline int get_base_info_filereq(struct filereq_t *req) {
 	req->tgid = bpf_get_current_pid_tgid() >> 32 ;
 	req->proctime = current->start_boottime;
 	req->uid = bpf_get_current_uid_gid();
+	req->size = sizeof(struct filereq_t);
 
 	bpf_printk("pid is :%d", req->pid);
 	bpf_printk("tgid is :%d", req->tgid);
