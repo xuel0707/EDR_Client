@@ -500,6 +500,7 @@ struct ebpf_filereq_t {
 	char cmd[S_CMDLEN];
 	char cwd[S_CWDLEN];
 	char args[8][64];            // Used to store the arguments.
+	int argc;
 };
 
 struct sniper_ip {

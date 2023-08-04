@@ -517,7 +517,7 @@ void *kexec_msgd(void *ptr)
 #else
 
 		if (!execve_program_obj) {
-			execve_program_obj = get_bpf_object(EBPF_EXECVE);
+			execve_program_obj = get_bpf_object(EBPF_EXECVE_OBJ);
 			if (!execve_program_obj) {
 				sleep(1);
 				continue;

@@ -271,7 +271,7 @@ void *knet_msgd(void *ptr)
 #endif
 
 		if (!net_program_obj) {
-			net_program_obj = get_bpf_object(EBPF_NET);
+			net_program_obj = get_bpf_object(EBPF_NET_OBJ);
 			if (!net_program_obj) {
 				sleep(1);
 				continue;

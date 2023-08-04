@@ -35,6 +35,7 @@ struct {
 // cat /sys/kernel/debug/tracing/events/syscalls/sys_enter_execve/format
 SEC("tp/syscalls/sys_enter_execve")
 int trace_enter_execve(struct sys_enter_execve_args *ctx) {
+
 	char realpath[CHAR_MAX] = {0};
 	struct task_struct *current = bpf_get_current_task_btf();
 	bpf_printk("file comm is :%s", current->comm);

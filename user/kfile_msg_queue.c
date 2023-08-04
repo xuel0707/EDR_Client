@@ -299,7 +299,7 @@ void *kfile_msgd(void *ptr)
 #else
 
 		if (!file_program_obj) {
-			file_program_obj = get_bpf_object(EBPF_FILE);
+			file_program_obj = get_bpf_object(EBPF_FILE_OBJ);
 			if (!file_program_obj) {
 				sleep(1);
 				continue;

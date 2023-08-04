@@ -1103,6 +1103,7 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 	} else {
 		path = msg->pathname;
 	}
+	printf("111111111111111111111111 path is %s\n", path);
 
 	/* 阻断成功的时候算旧的文件md5值 */
 	if (md5_filter_large_file(path, md5) < 0) {
@@ -1886,7 +1887,16 @@ void *file_monitor(void *ptr)
 		/* 从进程获取不到task时，不用取父进程的task，自己赋值成员的值，以防后面用到process时不一致 */
 		taskstat = get_taskstat_rdlock(rep->pid, FILE_GET);
 		if (!taskstat) {
-			strncpy(msg.cmd, &rep->args, rep->pro_len);
+#if 0
+			strncpy(msg.cmd, &rep->args, sizeof(rep->args));
+#else
+			strncpy(msg.cmd, rep->args[0], 32);
+			for (int i = 0; i < rep->argc; i++) {
+				if (i > 0)
+					strncat(msg.args, " ", 1);
+				strncat(msg.args, rep->args[i], 32);
+			}
+#endif
 			msg.cmd[S_CMDLEN-1] = 0;
 			if (msg.tty[0] != 0) {
 				get_session_uuid(msg.tty, msg.session_uuid);
@@ -2007,6 +2017,7 @@ void *file_monitor(void *ptr)
 
 	}
 
+	printf("file thread exit\n");
 	INFO("file thread exit\n");
 
 	return NULL;

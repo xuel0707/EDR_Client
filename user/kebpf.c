@@ -14,7 +14,7 @@
 
 extern int cwdmod;
 
-struct bpf_object *bpf_objects[EBPF_PROGRAMS_NUM] = {0};
+struct bpf_object *bpf_objects[EBPF_OBJ_NUM] = {0};
 struct bpf_link *bpf_links[EBPF_PROGRAMS_NUM] = {0};
 
 int load_ebpf_program(void)
@@ -64,7 +64,6 @@ int load_ebpf_program(void)
         close(fd_exec);
         return -1;
     }
-    // printf("Debug Point 1111111 Hereeeeeee!!!!!!!!!!!!!!!!\n");
 
     errno = 0;
     // Secondly open the file ebpf Program.
@@ -81,7 +80,6 @@ int load_ebpf_program(void)
         save_sniper_status(failinfo);
         return -1;
     }
-    // printf("Debug Point 22222222222222 Hereeeeeee!!!!!!!!!!!!!!!!\n");
 
     if (fstat(fd_file, &st) < 0) {
         snprintf(failinfo, sizeof(failinfo),
@@ -92,7 +90,6 @@ int load_ebpf_program(void)
         close(fd_file);
         return -1;
     }
-    // printf("Debug Hereeeeeee!!!!!!!!!!!!!!!!\n");
 
     errno = 0;
     // Secondly open the file ebpf Program.
@@ -147,19 +144,27 @@ int load_ebpf_program(void)
 
     printf("Ok! BPF Program loaded......\n");
     // NOTE: currently we only have execve hook
-    bpf_objects[EBPF_EXECVE] = obj_exec;
-    bpf_objects[EBPF_FILE]   = obj_file;
-    bpf_objects[EBPF_NET]   = obj_net;
+    bpf_objects[EBPF_EXECVE_OBJ] = obj_exec;
+    bpf_objects[EBPF_FILE_OBJ]   = obj_file;
+    bpf_objects[EBPF_NET_OBJ]    = obj_net;
 
     // Find the program been loaded into the kernel.
     struct bpf_program *tp_execve_prog = bpf_object__find_program_by_name(obj_exec, "trace_enter_execve");
-    struct bpf_program *lsm_file_prog = bpf_object__find_program_by_name(obj_file, "lsm_file_open");
+    struct bpf_program *lsm_file_open_prog = bpf_object__find_program_by_name(obj_file, "lsm_file_open");
+    struct bpf_program *lsm_file_create_prog = bpf_object__find_program_by_name(obj_file, "lsm_file_create");
+    struct bpf_program *lsm_file_rename_prog = bpf_object__find_program_by_name(obj_file, "lsm_file_rename");
+    struct bpf_program *lsm_file_link_prog = bpf_object__find_program_by_name(obj_file, "lsm_file_link");
+    struct bpf_program *lsm_file_unlink_prog = bpf_object__find_program_by_name(obj_file, "lsm_file_unlink");
     struct bpf_program *fentry_net_prog = bpf_object__find_program_by_name(obj_net, "tcp_connect");
 
     // attach the program into the Hooks.
-    bpf_links[EBPF_EXECVE] = bpf_program__attach(tp_execve_prog);
-    bpf_links[EBPF_FILE] = bpf_program__attach(lsm_file_prog);
-    bpf_links[EBPF_NET] = bpf_program__attach(fentry_net_prog);
+    bpf_links[EBPF_EXECVE_PROG] = bpf_program__attach(tp_execve_prog);
+    bpf_links[EBPF_FILE_OPEN_PROG] = bpf_program__attach(lsm_file_open_prog);
+    bpf_links[EBPF_FILE_CREATE_PROG] = bpf_program__attach(lsm_file_create_prog);
+    bpf_links[EBPF_FILE_RENAME_PROG] = bpf_program__attach(lsm_file_rename_prog);
+    bpf_links[EBPF_FILE_LINK_PROG] = bpf_program__attach(lsm_file_link_prog);
+    bpf_links[EBPF_FILE_UNLINK_PROG] = bpf_program__attach(lsm_file_unlink_prog);
+    bpf_links[EBPF_NET_PROG] = bpf_program__attach(fentry_net_prog);
 
     // struct bpf_map *exec_event_ringbuf_map = bpf_object__find_map_by_name(obj, "events");
     // int ringbuf_map_fd = bpf_map__fd(exec_event_ringbuf_map);
@@ -172,14 +177,23 @@ int load_ebpf_program(void)
 int unload_ebpf_program(void)
 {
     printf("[kebpf] unload_ebpf_program\n");
-    int destroy_exec_res = bpf_link__destroy(bpf_links[EBPF_EXECVE]);
-    int destroy_file_res = bpf_link__destroy(bpf_links[EBPF_FILE]);
-    int destroy_net_res = bpf_link__destroy(bpf_links[EBPF_NET]);
+    int destroy_exec_res = bpf_link__destroy(bpf_links[EBPF_EXECVE_PROG]);
+    int destroy_file_open_res = bpf_link__destroy(bpf_links[EBPF_FILE_OPEN_PROG]);
+    int destroy_file_create_res = bpf_link__destroy(bpf_links[EBPF_FILE_CREATE_PROG]);
+    int destroy_file_rename_res = bpf_link__destroy(bpf_links[EBPF_FILE_RENAME_PROG]);
+    int destroy_file_link_res = bpf_link__destroy(bpf_links[EBPF_FILE_LINK_PROG]);
+    int destroy_file_unlink_res = bpf_link__destroy(bpf_links[EBPF_FILE_UNLINK_PROG]);
+    int destroy_net_res = bpf_link__destroy(bpf_links[EBPF_NET_PROG]);
     printf("bpf exec link destroy result: %d\n", destroy_exec_res);
-    printf("bpf file link destroy result: %d\n", destroy_file_res);
+    printf("bpf file link destroy result: %d\n", destroy_file_open_res);
+    printf("bpf file link destroy result: %d\n", destroy_file_create_res);
+    printf("bpf file link destroy result: %d\n", destroy_file_rename_res);
+    printf("bpf file link destroy result: %d\n", destroy_file_link_res);
+    printf("bpf file link destroy result: %d\n", destroy_file_unlink_res);
     printf("bpf net link destroy result: %d\n", destroy_net_res);
 
-    return destroy_exec_res + destroy_file_res + destroy_net_res;
+    return destroy_exec_res + destroy_file_open_res + destroy_file_create_res + destroy_file_rename_res +
+        destroy_file_link_res + destroy_file_unlink_res + destroy_net_res;
 }
 
 struct bpf_object *get_bpf_object(int type)

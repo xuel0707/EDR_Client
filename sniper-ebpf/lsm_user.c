@@ -117,7 +117,7 @@ struct bpf_object *load_file_program(char *file_path) {
         return NULL;
     }
 
-    struct bpf_program *tp_file_prog = bpf_object__find_program_by_name(file_obj, "lsm_file_unlink");
+    struct bpf_program *tp_file_prog = bpf_object__find_program_by_name(file_obj, "lsm_file_open");
     tp_file_link = bpf_program__attach(tp_file_prog);
 
     return file_obj;
@@ -143,12 +143,19 @@ struct bpf_object *load_net_program(char *net_path) {
 
 int main(int argc, char **argv) {
 
-    // char exec_path[PATH_MAX];
-    // sprintf(exec_path, "%s/lsm_kern.o", dirname(argv[0]));
-    // struct bpf_object* exec_obj = load_exec_program(exec_path);
-    // if (!exec_obj){
-    //     return -1;
-    // }
+    char exec_path[PATH_MAX];
+    sprintf(exec_path, "%s/lsm_kern.o", dirname(argv[0]));
+    struct bpf_object* exec_obj = load_exec_program(exec_path);
+    if (!exec_obj){
+        return -1;
+    }
+
+    char file_path[PATH_MAX];
+    sprintf(file_path, "%s/ebpf_file_kern.o", dirname(argv[0]));
+    struct bpf_object* file_obj = load_file_program(file_path);
+    if (!file_obj){
+        return -1;
+    }
 
     char net_path[PATH_MAX];
     sprintf(net_path, "%s/ebpf_net_kern.o", dirname(argv[0]));

@@ -632,9 +632,19 @@ extern void save_thread_time(unsigned int thread_seq);
 
 /* kebpf.c */
 enum {
-    EBPF_EXECVE = 0,
-	EBPF_FILE = 1,
-	EBPF_NET = 2,
+    EBPF_EXECVE_OBJ = 0,
+	EBPF_FILE_OBJ = 1,
+	EBPF_NET_OBJ = 2,
+    EBPF_OBJ_NUM,
+};
+enum {
+    EBPF_EXECVE_PROG = 0,
+	EBPF_FILE_OPEN_PROG = 1,
+	EBPF_FILE_CREATE_PROG = 2,
+	EBPF_FILE_RENAME_PROG = 3,
+	EBPF_FILE_LINK_PROG = 4,
+	EBPF_FILE_UNLINK_PROG = 5,
+	EBPF_NET_PROG = 6,
     EBPF_PROGRAMS_NUM,
 };
 extern int load_ebpf_program(void);

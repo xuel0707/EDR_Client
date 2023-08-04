@@ -1,11 +1,10 @@
-#define CHAR_MAX 32
+#define CHAR_MAX 64
 #define S_CMDLEN 400
 #define PATH_MAX 4096
 #define MAX_ERRNO 4095
 
 #define unlikely(cond) (cond)
-#define IS_ERR_VALUE(x) unlikely((unsigned long)(void *)x >= MAX_ERRNO)
-
+#define IS_ERR_VALUE(x) unlikely((unsigned long)(void *)(x) >= (unsigned long)-MAX_ERRNO)
 
 static inline bool IS_ERR(const void* ptr) {
 	if (ptr != NULL) {
@@ -113,6 +112,15 @@ bool my_strstr(char* haystack, char* needle) {
 	return false;
 }
 
+int my_strncmp(char *str1, char *str2, int n) {
+	for (int i=0;i<n;i++) {
+		if (str1[i] != str2[i])
+			return -1;
+		if (str1[i] == '\0')
+			return 0;
+	}
+	return 0;
+}
 
 // static inline void my_strncpy(char* dest, char* src, int n) {
 
@@ -190,6 +198,7 @@ static inline int get_absolute_path(char *realpath) {
 	struct dentry *file_dentry= NULL;
 	int len = 0;
 	char temp[CHAR_MAX] = {0};
+	char realpath_backup[CHAR_MAX] = {0};
 
 	// file_dentry = bprm->file->f_path.dentry;
 	file_dentry = current_task->fs->pwd.dentry;
@@ -199,31 +208,74 @@ static inline int get_absolute_path(char *realpath) {
 	// Get the superior dir in "d_parent" by recursion.
 	// We set The Max Recursion Time to 8.
 	for (int i=0;i<8;i++){
-
+		bpf_probe_read_str(realpath_backup, sizeof(realpath_backup), realpath);
 		bpf_probe_read_kernel_str(temp, sizeof(file_dentry->d_iname), file_dentry->d_iname);
-		temp[CHAR_MAX-1] = 0;
+		// temp[CHAR_MAX-1] = 0;
 		len = my_strlen(temp);
 
-		bpf_printk("the length of current argument is :%d", len);  // Debug code, Delete/Annotate it when make it through.
+		// bpf_printk("the length of current dentry is :%d", len);  // Debug code, Delete/Annotate it when make it through.
+		// bpf_printk("current temp is %s", temp);
+		// bpf_printk("current filename is %s", realpath);
 
 		// If the length of the d_iname is 1, the current dir or file name is NULL, meaning our recursion reached a ending.
 		if (len==1)
 			break;
 
 		// Move the original String "len + 1" chars Afterwords, And Load the parent d_iname into the "realpath"
-		for (int j=CHAR_MAX-2;j>len;j--){
-			realpath[j] = realpath[j-len-1];
-		}
-		realpath[CHAR_MAX-1] = 0;   // Ensure there is a ending char in realpath.
-		// realpath[len] = '/';
-
+		bpf_probe_read_str(realpath+len+1, CHAR_MAX-len-1, realpath_backup);
 		bpf_probe_read_kernel(realpath + 1, len, temp);
 		realpath[0] = '/';
+		realpath[CHAR_MAX-1] = 0;   // Ensure there is a ending char in realpath.
 
 		file_dentry = file_dentry->d_parent;  // Recursion
 	}
 
 	bpf_printk("cwd is %s", realpath);
+	len = my_strlen(realpath);
+	return len;
+}
+
+/*
+Get the absolute path of a dentry into var "realpath"
+
+@Args:
+dentry: struct dentry.
+realpath : A pointer pointing to a string.
+temp : A temporary string.
+len : used to store current length of the string.
+*/
+static inline int get_absolute_path_from_dentry(struct dentry *dentry, char *realpath) {
+	int len = 0;
+	char temp[CHAR_MAX] = {0};
+	char realpath_backup[CHAR_MAX] = {};
+	struct dentry *file_dentry= NULL;
+	file_dentry = dentry;
+	// The Logic is :
+	// We could get the current dir or file name by d_iname.
+	// Get the superior dir in "d_parent" by recursion.
+	// We set The Max Recursion Time to 8.
+	for (int i=0;i<8;i++){
+		bpf_probe_read_str(realpath_backup, sizeof(realpath_backup), realpath);
+		bpf_probe_read_kernel_str(temp, sizeof(file_dentry->d_iname), file_dentry->d_iname);
+		// temp[CHAR_MAX-1] = 0;
+		len = my_strlen(temp);
+
+		// bpf_printk("the length of current dentry is :%d", len);  // Debug code, Delete/Annotate it when make it through.
+		// If the length of the d_iname is 1, representing the current dir or file name is "/", meaning our recursion reached a ending.
+		if (len==1)
+			break;
+
+		// Move the original String "len + 1" chars Afterwards, And Load the parent d_iname into the "realpath"
+
+		bpf_probe_read_str(realpath+len+1, CHAR_MAX-len-1, realpath_backup);
+		bpf_probe_read_kernel(realpath + 1, len, temp);
+		realpath[0] = '/';
+		realpath[CHAR_MAX-1] = 0;   // Ensure there is a ending char in realpath.
+
+		file_dentry = file_dentry->d_parent;  // Recursion
+	}
+
+	bpf_printk("absolute path is %s", realpath);
 	len = my_strlen(realpath);
 	return len;
 }
@@ -245,8 +297,8 @@ static inline int skip_current(struct parent_info *pinfo) {
 	task = bpf_get_current_task_btf();
 	int pid = task->pid; // pid is the current process id
 
-	// char temp[CHAR_MAX] = {0};
-	// bpf_probe_read_kernel_str(temp, sizeof(temp), task->comm);
+	char temp[CHAR_MAX] = {0};
+	bpf_probe_read_kernel_str(temp, sizeof(temp), task->comm);
 
 	// if (my_strcmp(temp, "sniper_chk") == 0)
 	// 	return 1;
@@ -284,7 +336,7 @@ static inline int skip_current(struct parent_info *pinfo) {
 		if (!parent)
 			return 0;
 
-		// bpf_probe_read_kernel_str(temp, sizeof(temp), parent->comm);
+		bpf_probe_read_kernel_str(temp, sizeof(temp), parent->comm);
 
 		// if (my_strcmp(temp, "sniper_chk") == 0)
 		// 	return 1;
@@ -384,11 +436,10 @@ static inline int get_base_info_filereq(struct filereq_t *req) {
 	req->tgid = bpf_get_current_pid_tgid() >> 32 ;
 	req->proctime = current->start_boottime;
 	req->uid = bpf_get_current_uid_gid();
-	req->size = sizeof(struct filereq_t);
 
 	bpf_printk("pid is :%d", req->pid);
 	bpf_printk("tgid is :%d", req->tgid);
-	bpf_printk("proctime is :%d", req->proctime);
+	bpf_printk("proctime is :%lu", req->proctime);
 	bpf_printk("uid is :%d", req->uid);
 
 	struct file *file0 = current->files->fd_array[0];
@@ -426,4 +477,38 @@ static inline unsigned int get_mnt_id() {
 static inline char *get_uts_name() {
     struct task_struct *current = bpf_get_current_task_btf();
     return current->nsproxy->uts_ns->name.nodename;
+}
+
+/*
+Get arguments from "current->mm"
+*/
+int get_args_from_mm(struct filereq_t *req) {
+	if (!req)
+		return -1;
+	struct mm_struct *mm = bpf_get_current_task_btf()->mm;
+    if (!mm) {
+        return 0;
+    }
+	// struct vm_area_struct *vma = mm->mmap;
+    // char argv[MAX_ARGS][32];
+	void *p = (void *)mm->arg_start;
+    int argc = 0;       // Init the value of "argc".
+    int i, len;
+
+	for (i = 0; i < MAX_ARGS; i++) {
+		// len = bpf_probe_read_str(&argv[i], sizeof(argv[i]), p);
+		len = bpf_probe_read_str(req->args[i], sizeof(req->args[i]), p);
+		
+		bpf_printk("current arg is %s(lengrh %d)", p, len);
+
+		if (len <= 0)
+			break;
+		argc++;
+
+		p += len;
+		if (p > (void *)mm->arg_end)
+			break;
+	}
+	req->argc = argc;
+	return 0;
 }
