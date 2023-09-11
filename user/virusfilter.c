@@ -126,7 +126,12 @@ void *virusfilter_monitor(void *ptr)
 
 		msg.pid = rep->pid;
 		msg.proctime = rep->proctime;
+#if 0
 		memcpy(&msg.start_tv, &rep->event_tv, sizeof(struct timeval));
+#else
+		gettimeofday(&msg.start_tv, NULL);
+#endif
+
 
 		/*
 		 * 如果pathname长度小于sizeof(msg.pathname)，且结尾没有\0，

@@ -3893,6 +3893,9 @@ void *process_monitor(void *ptr)
 		if (!req) {
 			continue;
 		}
+
+		printf("[Sniper] Process:%s(%d) uid(%d), tgid(%d), filename is %s\n", req->cwd, req->pid, req->uid, req->tgid, req->cmd);
+
 		/* 忽略定时任务sniper_chk,assist_sniper_chk及子任务 */
 		if (strcmp(req->comm, "sniper_chk") == 0 ||
 			strcmp(req->comm, "assist_sniper_chk") == 0 ||

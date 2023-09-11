@@ -469,12 +469,12 @@ struct ebpf_filereq_t {
 	int tgid;      // The Thread Group id.
 	pid_t pid;       // The process id.
 	// int did_exec;  // The flag that whether a file is over.
-	struct timeval event_tv;
+	// struct my_timeval event_tv;
 	unsigned long proctime;      // the time that process started.
-	unsigned long pipein;        // The pipe used to input.
-	unsigned long pipeout;       // The pipe used to output.
-	unsigned long exeino;        // ???
-	struct file *exe_file;       // ???
+	// unsigned long pipein;        // The pipe used to input.
+	// unsigned long pipeout;       // The pipe used to output.
+	// unsigned long exeino;        // ???
+	// struct file *exe_file;       // ???
 	unsigned short op_type;      // The file operation (1:open 2:close 3:unlink 4:rename 5:symlink)
 	unsigned short type;         // 1:sensitive 2:log_delete 3:safe 4:logcollector
 	unsigned short size;         // request size: head + args
@@ -485,9 +485,7 @@ struct ebpf_filereq_t {
 	long mtime_nsec;             // The mtime of the filem unit is nanosecond.
 	long long int file_size;
 	long long int newfile_size;
-	struct ebpf_parent_info pinfo;    // The parent processes information (Up to 4 generations).
-	char comm[16];
-	char parent_comm[16];
+	struct parent_info pinfo;    // The parent processes information (Up to 4 generations).
 	char filename[64];
 	unsigned int path_len;
 	char new_filename[64];
@@ -497,9 +495,11 @@ struct ebpf_filereq_t {
 	int terminate;               // Been Abandoned, used to Judge whether the Block is needed.
 	char tty[S_TTYLEN];
 	char nodename[S_NAMELEN+1];
-	char cmd[S_CMDLEN];
-	char cwd[S_CWDLEN];
+	// char cmd[S_CMDLEN];
+	// char cwd[S_CWDLEN];
 	char args[8][64];            // Used to store the arguments.
+	char comm[16];
+	char parent_comm[16];
 	int argc;
 };
 

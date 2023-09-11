@@ -1536,7 +1536,7 @@ static int in_unexec_dirs(char *cmd, char *cwd)
 }
 
 /* 检测是否异常命令。返回0，正常；1，异常 */
-static int is_abnormal(taskstat_t *taskstat)
+int is_abnormal(taskstat_t *taskstat)
 {
 #if 0
 	if (!prule.abnormal_on || !taskstat || taskstat->flags & TASK_DOCKER) {

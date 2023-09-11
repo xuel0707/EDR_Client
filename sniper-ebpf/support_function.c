@@ -272,7 +272,8 @@ static inline int get_absolute_path_from_dentry(struct dentry *dentry, char *rea
 		realpath[0] = '/';
 		realpath[CHAR_MAX-1] = 0;   // Ensure there is a ending char in realpath.
 
-		file_dentry = file_dentry->d_parent;  // Recursion
+		bpf_probe_read(&file_dentry, sizeof(file_dentry), &file_dentry->d_parent);  // Recursion
+		// file_dentry = file_dentry->d_parent;  // Recursion
 	}
 
 	bpf_printk("absolute path is %s", realpath);
@@ -410,21 +411,21 @@ static inline int get_base_info_taskreq(struct taskreq_t *req) {
 	req->uid = bpf_get_current_uid_gid();
 	req->euid = current->real_cred->euid.val;
 
-	bpf_printk("pid is :%d", req->pid);
-	bpf_printk("tgid is :%d", req->tgid);
-	bpf_printk("proctime is :%d", req->proctime);
-	bpf_printk("uid is :%d", req->uid);
+	// bpf_printk("pid is :%d", req->pid);
+	// bpf_printk("tgid is :%d", req->tgid);
+	// bpf_printk("proctime is :%d", req->proctime);
+	// bpf_printk("uid is :%d", req->uid);
 
 	struct file *file0 = current->files->fd_array[0];
 	struct file *file1 = current->files->fd_array[1];
 	req->pipein = file0->f_path.dentry->d_inode->i_ino;
 	req->pipeout = file1->f_path.dentry->d_inode->i_ino;
-	bpf_printk("i_ino_0 %d", file0->f_inode->i_ino);
-	bpf_printk("i_ino_1 %d", file1->f_inode->i_ino);
+	// bpf_printk("i_ino_0 %d", file0->f_inode->i_ino);
+	// bpf_printk("i_ino_1 %d", file1->f_inode->i_ino);
 
 	req->exe_file = current->mm->exe_file;
 	req->exeino = req->exe_file->f_path.dentry->d_inode->i_ino;
-	bpf_printk("exe_ino_1 %d", file1->f_inode->i_ino);
+	// bpf_printk("exe_ino_1 %d", file1->f_inode->i_ino);
 
 	return 0;
 }
@@ -442,16 +443,16 @@ static inline int get_base_info_filereq(struct filereq_t *req) {
 	bpf_printk("proctime is :%lu", req->proctime);
 	bpf_printk("uid is :%d", req->uid);
 
-	struct file *file0 = current->files->fd_array[0];
-	struct file *file1 = current->files->fd_array[1];
-	req->pipein = file0->f_path.dentry->d_inode->i_ino;
-	req->pipeout = file1->f_path.dentry->d_inode->i_ino;
-	bpf_printk("i_ino_0 %d", file0->f_inode->i_ino);
-	bpf_printk("i_ino_1 %d", file1->f_inode->i_ino);
+	// struct file *file0 = current->files->fd_array[0];
+	// struct file *file1 = current->files->fd_array[1];
+	// req->pipein = file0->f_path.dentry->d_inode->i_ino;
+	// req->pipeout = file1->f_path.dentry->d_inode->i_ino;
+	// bpf_printk("i_ino_0 %d", file0->f_inode->i_ino);
+	// bpf_printk("i_ino_1 %d", file1->f_inode->i_ino);
 
-	req->exe_file = current->mm->exe_file;
-	req->exeino = req->exe_file->f_path.dentry->d_inode->i_ino;
-	bpf_printk("exe_ino_1 %d", file1->f_inode->i_ino);
+	// req->exe_file = current->mm->exe_file;
+	// req->exeino = req->exe_file->f_path.dentry->d_inode->i_ino;
+	// bpf_printk("exe_ino_1 %d", file1->f_inode->i_ino);
 
 	return 0;
 }

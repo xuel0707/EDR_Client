@@ -49,7 +49,7 @@ struct {
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
-    __uint(max_entries, 512 * 512); /* 256 KB */
+    __uint(max_entries, 1024*1024); /* 1024 KB */
 } filereq_ringbuf SEC(".maps");
 
 loff_t get_file_size(struct file *file) {
@@ -206,7 +206,6 @@ int BPF_PROG(lsm_inode_permission, struct inode *inode, int mask, int ret) {
 SEC("lsm/file_open")
 int BPF_PROG(lsm_file_open, struct file *file, int ret) {
 
-	// bpf_printk("I'm in LSM file_open Hook...");
 	// bpf_printk("flags is %u", file->f_flags);
 	// if ((file->f_flags & 01) != 01)
 	// 	return 0;
@@ -217,6 +216,7 @@ int BPF_PROG(lsm_file_open, struct file *file, int ret) {
 
 	// Only to normal file.
 	if (!S_ISREG(file->f_inode->i_mode)) {
+		// bpf_printk("(%s) i_mode is %d, not regular (0100000) file", file->f_path.dentry->d_iname, file->f_inode->i_mode);
 		return 0;
 	}
 
@@ -238,9 +238,10 @@ int BPF_PROG(lsm_file_open, struct file *file, int ret) {
 	// }
 	// else
 	// 	return 0;
+	bpf_printk("I'm in LSM file_open Hook...\n==============================");
 
 	struct task_struct *current = bpf_get_current_task_btf();
-	struct filereq_t *req = bpf_ringbuf_reserve(&filereq_ringbuf, sizeof(*req), 0);
+	struct filereq_t *req = bpf_ringbuf_reserve(&filereq_ringbuf, sizeof(struct filereq_t), 0);
 	if (!req)
 		return 0;
 
@@ -271,7 +272,6 @@ int BPF_PROG(lsm_file_open, struct file *file, int ret) {
 	get_absolute_path(req->pro_pathname);
 	bpf_printk("filename is %s", req->filename);
 
-
 	/* Get mnt_id and nodename */
 	req->mnt_id = get_mnt_id();
 	bpf_probe_read_str(req->nodename, sizeof(req->nodename), get_uts_name());
@@ -279,7 +279,7 @@ int BPF_PROG(lsm_file_open, struct file *file, int ret) {
 
 	bpf_ringbuf_submit(req, 0);
 
-	return ret;
+	return 0;
 }
 
 SEC("lsm/inode_create")
@@ -306,6 +306,7 @@ int BPF_PROG(lsm_file_create, struct inode *dir, struct dentry *dentry, umode_t 
 	// }
 	// else
 	// 	return 0;
+	bpf_printk("I'm in LSM inode create Hook...\n==============================");
 
 	struct task_struct *current = bpf_get_current_task_btf();
 	struct filereq_t *req = bpf_ringbuf_reserve(&filereq_ringbuf, sizeof(*req), 0);
@@ -499,6 +500,7 @@ int BPF_PROG(lsm_file_rename, struct inode *old_dir, struct dentry *old_dentry,
 			    unsigned int flags) {
 
 	// bpf_printk("You are in rename hook!");
+	bpf_printk("I'm in LSM inode rename Hook...\n==============================");
 
 	if (IS_ERR(old_dir) || IS_ERR(old_dentry) || IS_ERR(new_dir) || IS_ERR(new_dentry))
 		return 0;

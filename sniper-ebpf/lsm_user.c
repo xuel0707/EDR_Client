@@ -30,6 +30,8 @@ int handle_exec_event(void *ctx, void *data, size_t data_sz) {
 }
 
 int handle_file_event(void *ctx, void *data, size_t data_sz) {
+    struct filereq_t *e = data;
+    printf("filename is %s\n", e->filename);
     return 0;
 }
 
@@ -143,12 +145,12 @@ struct bpf_object *load_net_program(char *net_path) {
 
 int main(int argc, char **argv) {
 
-    char exec_path[PATH_MAX];
-    sprintf(exec_path, "%s/lsm_kern.o", dirname(argv[0]));
-    struct bpf_object* exec_obj = load_exec_program(exec_path);
-    if (!exec_obj){
-        return -1;
-    }
+    // char exec_path[PATH_MAX];
+    // sprintf(exec_path, "%s/lsm_kern.o", dirname(argv[0]));
+    // struct bpf_object* exec_obj = load_exec_program(exec_path);
+    // if (!exec_obj){
+    //     return -1;
+    // }
 
     char file_path[PATH_MAX];
     sprintf(file_path, "%s/ebpf_file_kern.o", dirname(argv[0]));
@@ -163,42 +165,6 @@ int main(int argc, char **argv) {
     if (!net_obj){
         return -1;
     }
-    // // The location of the bytecode file.
-    // char path[PATH_MAX];
-    // sprintf(path, "%s/lsm_kern.o", dirname(argv[0]));
-    // printf("bytecode file path: %s\n", path);
-
-    // char path_file[PATH_MAX];
-    // sprintf(path_file, "%s/ebpf_file_kern.o", dirname(argv[0]));
-    // printf("bytecode file_fileebpf path: %s\n", path_file);
-
-    // // Open and Load the bytecode file.
-    // struct bpf_object *obj;
-    // struct bpf_object *obj_file;
-    // obj = bpf_object__open(path);
-    // obj_file = bpf_object__open(path_file);
-    // printf("Ok! BPF bytecode open over......\n");
-
-    // int load_res = bpf_object__load(obj);
-    // if (load_res != 0){
-    //     printf("BPF Program loaded failed......\n");
-    //     return -1;
-    // }
-
-    // int file_load_res = bpf_object__load(obj_file);
-    // if (file_load_res != 0){
-    //     printf("f=file BPF Program loaded failed......\n");
-    //     return -1;
-    // }
-    // printf("Ok! BPF Program loaded......\n");
-
-    // // Find the program been loaded into the kernel.
-    // struct bpf_program *tp_execve_prog = bpf_object__find_program_by_name(obj, "trace_enter_execve");
-    // struct bpf_program *tp_file_prog = bpf_object__find_program_by_name(obj_file, "lsm_file_unlink");
-
-    // // attach the program into the Hooks.
-    // tp_execve_link = bpf_program__attach(tp_execve_prog);
-    // tp_file_link = bpf_program__attach(tp_file_prog);
 
     // register signal handlers
     signal(SIGINT, sig_handler);    // Ctrl + C
@@ -214,22 +180,34 @@ int main(int argc, char **argv) {
     //     printf("Failed to create ring buffer\n");
     //     return -1;
     // }
-    struct bpf_map *net_event_ringbuf_map = bpf_object__find_map_by_name(net_obj, "netreq_ringbuf");
-    int net_ringbuf_map_fd = bpf_map__fd(net_event_ringbuf_map);
-    struct ring_buffer *net_event_ringbuf = NULL;
-    net_event_ringbuf = ring_buffer__new(net_ringbuf_map_fd, handle_net_event, NULL, NULL);
 
-    if (!net_event_ringbuf) {
+    struct bpf_map *file_event_ringbuf_map = bpf_object__find_map_by_name(file_obj, "filereq_ringbuf");
+    int file_ringbuf_map_fd = bpf_map__fd(file_event_ringbuf_map);
+    struct ring_buffer *file_event_ringbuf = NULL;
+    file_event_ringbuf = ring_buffer__new(file_ringbuf_map_fd, handle_file_event, NULL, NULL);
+
+    if (!file_event_ringbuf) {
         printf("Failed to create ring buffer\n");
         return -1;
     }
+
+    // struct bpf_map *net_event_ringbuf_map = bpf_object__find_map_by_name(net_obj, "netreq_ringbuf");
+    // int net_ringbuf_map_fd = bpf_map__fd(net_event_ringbuf_map);
+    // struct ring_buffer *net_event_ringbuf = NULL;
+    // net_event_ringbuf = ring_buffer__new(net_ringbuf_map_fd, handle_net_event, NULL, NULL);
+
+    // if (!net_event_ringbuf) {
+    //     printf("Failed to create ring buffer\n");
+    //     return -1;
+    // }
+
     printf("receive from ring buf...\n");
     printf("%-15s %-6s -> %-15s %-6s\n", "Src addr", "Port", "Dest addr", "Port");
     while(1) {
-        ring_buffer__poll(net_event_ringbuf, 100 /* timeout, ms */);
+        ring_buffer__poll(file_event_ringbuf, 100 /* timeout, ms */);
+        // ring_buffer__poll(net_event_ringbuf, 100 /* timeout, ms */);
     }
 
-    // struct bpf_link *lsm_link = bpf_program__attach_lsm(prog);
 
     // print bpf_map info.
     // struct bpf_map *lsm_map = bpf_object__find_map_by_name(obj, "socket_connect_map");
@@ -237,36 +215,6 @@ int main(int argc, char **argv) {
     // long key=-1, prev_key;
     // long val;
 
-    // TESTING PASSING STRUCT TO MAP
-
-    // struct bpf_map *book_map = bpf_object__find_map_by_name(obj, "book_test");
-    // int book_map_fd = bpf_map__fd(book_map);
-
-    // struct TestStruct book;
-    // memset(&book, 0, sizeof(book));
-    // strcpy(book.title, "Waging Heavy Peace");
-    // strcpy(book.author, "Neil Young");
-    // book.length = 998;
-
-    // int m = 10;
-    // int attempt = bpf_map_update_elem(book_map_fd, &m, &book, BPF_ANY);
-    // printf("Success is %d for adding a struct to the map.\n", attempt);
-
-    // // TESTING PASSING
-    // struct TestStruct t = {0};
-    // bpf_map_lookup_elem(req_map_fd, &zero, &t);
-    // struct taskreq_t req = {0};
-    // bpf_map_lookup_elem(req_map_fd, &zero, &req);
-
-    // printf("request pid is %d\n", req.pid);
-    // printf("request proctime is %ld\n", req.proctime);
-    // printf("request tgid is %d\n", req.tgid);
-
-    // for (int i=0; i<4;i++){
-    //     printf("current args is :%s\n", req.args[i]);
-    //     printf("generation %d uid is %d\n",i, req.pinfo.task[i].uid);
-    //     printf("generation %d comm is %s\n",i, req.pinfo.task[i].comm);
-    // }
 
 
     printf("the program is over......\n");

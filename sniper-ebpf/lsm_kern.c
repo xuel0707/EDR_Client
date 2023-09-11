@@ -38,7 +38,6 @@ int trace_enter_execve(struct sys_enter_execve_args *ctx) {
 
 	char realpath[CHAR_MAX] = {0};
 	struct task_struct *current = bpf_get_current_task_btf();
-	bpf_printk("file comm is :%s", current->comm);
 
 	struct taskreq_t *req = bpf_ringbuf_reserve(&taskreq_ringbuf, sizeof(*req), 0);
 	// Check whether the req is NULL, otherwise we couldn't operate it in eBPF.
@@ -55,17 +54,17 @@ int trace_enter_execve(struct sys_enter_execve_args *ctx) {
 
 	/* Get cmd (executable filename of current process) */
 	req->cmdlen = bpf_probe_read_str(req->cmd, sizeof(req->cmd), ctx->filename);
-	bpf_printk("filename(%d): %s", req->cmdlen, req->cmd);
+	// bpf_printk("filename(%d): %s", req->cmdlen, req->cmd);
 
 	/* Get the realpath of the cwd */
 	get_absolute_path(realpath);
 	req->cwdlen = bpf_probe_read_str(req->cwd, sizeof(req->cwd), realpath);
-	bpf_printk("cwd(%d): %s", req->cwdlen, req->cwd);
+	// bpf_printk("cwd(%d): %s", req->cwdlen, req->cwd);
 
 	/* Get the fields with respect to arguments */
 	get_args_argc(ctx->argv, req);
-	bpf_printk("argc is %d", req->argc);
-	bpf_printk("options is %d", req->options);
+	// bpf_printk("argc is %d", req->argc);
+	// bpf_printk("options is %d", req->options);
 
 	/* Get mnt_id and nodename */
 	req->mnt_id = get_mnt_id();
@@ -91,9 +90,12 @@ int trace_enter_execve(struct sys_enter_execve_args *ctx) {
     }
 
 	/* Get the fd number */
-	struct files_struct *files = current->files;
-	int files_number = count_files_num(files);
-	bpf_printk("current process has %d fd", files_number);
+	// struct files_struct *files = current->files;
+	// int files_number = count_files_num(files);
+	// bpf_printk("current process has %d fd", files_number);
+
+	bpf_printk("Process:%s(%d) uid(%d), tgid(%d), filename is %s", req->cwd, req->pid, req->uid, req->tgid, req->cmd);
+
 	bpf_ringbuf_submit(req, 0);
 
 	return 0;

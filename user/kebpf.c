@@ -198,7 +198,7 @@ int unload_ebpf_program(void)
 
 struct bpf_object *get_bpf_object(int type)
 {
-    if (type < 0 || type >= EBPF_EXECVE_HOOK_PROGRAM) {
+    if (type < 0 || type >= EBPF_OBJ_NUM) {
         printf("[kebpf] get_bpf_object error, invalid type: %d\n", type);
         return NULL;
     }
