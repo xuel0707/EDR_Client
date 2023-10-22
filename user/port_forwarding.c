@@ -300,6 +300,8 @@ int is_port_forward(taskstat_t *taskstat, int to_report_task_exit)
 	if (!prule.port_forward_on || !taskstat) {
 		return 0;
 	}
+	if (!taskstat)
+		return 0;
 
 	cmd = taskstat->cmd;
 	cmdline = taskstat->args;

@@ -544,14 +544,18 @@ static int report_domain(dnsqinfo_t *info, char *ip, char *name, const int type)
 
 	return req.flags.terminate;
 
-#if 0 //TODO 暂不报域名别名
+#if 0 
+	//TODO 暂不报域名别名
 	if (strcmp(info->domain, name) != 0) {
 		snprintf(req.domain, sizeof(req.domain), "%s", name);
 		req.size = size + strlen(req.domain) + 1;
 		send_msg_to_user((char *)&req, req.size, nl_net_pid);
 	}
 #endif
+
 }
+
+
 static int in_domaintbl(char *domain, domaintbl_t *tbl, int count, char *tblname)
 {
 	int i = 0;

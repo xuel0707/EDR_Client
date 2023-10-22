@@ -87,6 +87,7 @@
 #define PROCESS_MBR_PROTECT				1019 //MBR防护
 #define PROCESS_FIREWALL_CHANGE				1020 //非法修改防火墙规则
 #define PROCESS_FAKE_SYSPROCESS				1021 //伪造系统进程
+#define PROCESS_REQ_MALI_DOMAIN				1022  //请求恶意域名事件
 
 #define NET_ILLEGAL_CONNECTION				4003	
 

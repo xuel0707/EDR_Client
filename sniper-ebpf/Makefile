@@ -23,6 +23,7 @@ kern.o: $(KERN_C_FILES)
 	clang -S \
 	    -target bpf \
 	    -D __BPF_TRACING__ \
+		-D __TARGET_ARCH_x86 \
 	    $(CFLAGS) \
 	    -Wall \
 	    -Werror \

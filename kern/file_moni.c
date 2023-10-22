@@ -1733,7 +1733,7 @@ int check_illegal_script(char *pathname, char *new_pathname,
 
 	send_data_to_user((char *)req, req->size,
 				nl_file_pid, Probe_file);
-
+	printk("illegal_script: [%d]path:%s, process:%s @%s line:%d\r\n",op_type, pathname, process_path,__FILE__,__LINE__);
 	myfdebug("illegal_script: [%d]path:%s, process:%s\n",
 			op_type, pathname, process_path);
 	sniper_kfree(req, ARGS_LEN, KMALLOC_ILLSCRIPT);

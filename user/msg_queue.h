@@ -36,11 +36,11 @@ extern int msg_queue_count(msg_queue_t *p_queue);
 extern log_msg_t *msg_queue_pop(msg_queue_t *p_queue);
 
 /* 队列最大允许消息数 */
-#define MAX_QUEUE_DEPTH         10000
+#define MAX_QUEUE_DEPTH          		10000
 /* 病毒待过滤队列最大允许消息数 */
-#define MAX_FILTER_QUEUE_DEPTH         100000
+#define MAX_FILTER_QUEUE_DEPTH         	100000
 /* 病毒队列最大允许消息数 */
-#define MAX_VIRUS_QUEUE_DEPTH         100000
+#define MAX_VIRUS_QUEUE_DEPTH         	100000
 /* 压缩同类的调试日志数量，每N条报一次 */
 #define DEBUG_REPORT_FREQ       100
 /* 同类调试日志的时间间隔，间隔小于阈值，说明日志量大频繁，需要继续降低报告的频率 */

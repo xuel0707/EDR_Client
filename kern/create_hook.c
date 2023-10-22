@@ -12,27 +12,28 @@ static int my_inode_create(struct inode *dir, struct dentry *dentry, sniper_mode
 
 	/* file thread not ready or monitor off */
 	if (nl_file_pid == 0 || !sniper_fpolicy.file_engine_on || sniper_file_loadoff) {
+		printk("file thread not ready or monitor off @%s line:%d\r\n",__FILE__,__LINE__);
 		return 0;
 	}
 
 	inode = dentry->d_inode;
 	/* 只管文件 */
 	if (inode && !S_ISREG(inode->i_mode)) {
-                return 0;
-       	}
+		return 0;
+	}
 
 	if (skip_file(dentry->d_name.name)) {
-                return 0;
-       	}
+		return 0;
+	}
 
         /* Skip sniper self exec */
 	if (skip_current(&flags, &pinfo)) {
-                return 0;
-        }
+		return 0;
+	}
 
 	pathname = sniper_kmalloc(PATH_MAX, GFP_ATOMIC, KMALLOC_CREATEPATH);
 	if (pathname == NULL) {
-		myprintk("open: Out of memory!\n");
+		printk("open: Out of memory!\n");
 		return 0;
 	}
 
@@ -91,11 +92,11 @@ int sniper_inode_create(struct inode *dir, struct dentry *dentry, sniper_mode_t 
 {
 	int ret = 0;
 
-        atomic_inc(&sniper_usage[SNIPER_OPEN]);
+	atomic_inc(&sniper_usage[SNIPER_OPEN]);
 
 	ret = my_inode_create(dir, dentry, mode);
 
-        atomic_dec(&sniper_usage[SNIPER_OPEN]);
+	atomic_dec(&sniper_usage[SNIPER_OPEN]);
 
 	return ret;
 }

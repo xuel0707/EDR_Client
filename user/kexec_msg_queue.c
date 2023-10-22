@@ -1,9 +1,16 @@
-/*
- * 取内核进程消息，插入进程消息队列，进程工作线程消费消息
- * Author: zhengxiang
- */
-
+/* std */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+#include <zlib.h>
+#include <pthread.h>
+#include <curl/curl.h>
 #include "header.h"
+#include <sys/resource.h> 
 
 static int kexec_msg_queue_inited = 0;
 static struct list_head kexec_msg_queue = {0};
@@ -338,27 +345,14 @@ static kexec_msg_t *req2msg(taskreq_t *req)
 #else
 static kexec_msg_t *req2msg(struct ebpf_taskreq_t *req)
 {
-	kexec_msg_t *msg = NULL;
-
-	if (!req) {
-		return NULL;
-	}
-
-	msg = (kexec_msg_t *)sniper_malloc(sizeof(struct kexec_msg), PROCESS_GET);
+	kexec_msg_t *msg = (kexec_msg_t *)sniper_malloc(sizeof(struct kexec_msg), PROCESS_GET);
 	if (!msg) {
-		MON_ERROR("malloc kexec msg fail\n");
+		printf("malloc kexec msg fail@%s line:%d\r\n",__FILE__,__LINE__);
 		return NULL;
 	}
 
 	msg->datalen = sizeof(struct ebpf_taskreq_t);
-	msg->data = sniper_malloc(msg->datalen, PROCESS_GET);
-	if (!msg->data) {
-		MON_ERROR("malloc kexec msg databuf fail\n");
-		sniper_free(msg, sizeof(struct kexec_msg), PROCESS_GET);
-		return NULL;
-	}
-	memset(msg->data, 0, msg->datalen);
-	memcpy(msg->data, req, msg->datalen);
+	msg->data = req;
 	msg->repeat = 0;
 
 	return msg;
@@ -400,10 +394,6 @@ void kexec_msg_queue_push(struct ebpf_taskreq_t *req)
 	kexec_msg_t *msg = NULL;
 	// int drop = 0;
 
-	if (!req) {
-		return;
-	}
-
 	msg = req2msg(req);
 	if (!msg) {
 		return;
@@ -424,6 +414,8 @@ void kexec_msg_queue_push(struct ebpf_taskreq_t *req)
 	add_kexec_msg_queue_tail(msg);
 }
 #endif
+
+#if 0
 /* proccess线程从命令队列中取一个消息处理 */
 kexec_msg_t *get_kexec_msg(void)
 {
@@ -454,14 +446,70 @@ kexec_msg_t *get_kexec_msg(void)
 	pthread_mutex_unlock(&kexec_msg_queue_lock);
 	return NULL;
 }
+#else
+/* pop msg from queue */
+kexec_msg_t *get_kexec_msg(void)
+{
+	kexec_msg_t *msg = NULL;
 
-static int handle_taskreq_ringbuf_event(void *ctx, void *data, size_t data_sz) {
-    struct ebpf_taskreq_t *req = data;
+	if (!kexec_msg_queue_inited) 
+		return NULL;
 
-	if (msg_queue_full()) {
-		return 0;
+	pthread_mutex_lock(&kexec_msg_queue_lock);
+	if (!list_empty(&kexec_msg_queue)) {
+		msg = list_entry(kexec_msg_queue.next, kexec_msg_t, list);
+		if (msg) {
+			list_del(&msg->list);
+			kexec_msg_count--;
+			DBG2(DBGFLAG_TTT, "kexec get msg count:(%d)\n", kexec_msg_count);
+		}
 	}
+	pthread_mutex_unlock(&kexec_msg_queue_lock);
+
+	return msg;
+}
+#endif
+
+void bump_memlock_rlimit3(void)
+{
+	struct rlimit rlim_new = {
+		.rlim_cur	= RLIM_INFINITY,
+		.rlim_max	= RLIM_INFINITY,
+	};
+
+	if(setrlimit(RLIMIT_MEMLOCK, &rlim_new)){
+		printf("Failed to increase RLIMIT_MEMLOCK limit@%s line:%d\r\n",__FILE__,__LINE__);
+		exit(1);
+	}
+}
+
+static int ringbuf_event3(void *ctx, void *data, size_t data_sz) 
+{
+	const struct process_event  *e=data;
+
+    struct ebpf_taskreq_t *req=malloc(sizeof(struct ebpf_taskreq_t));
+	if(!req) return -1;
+
+	memset(req,0,sizeof(struct ebpf_taskreq_t));
+
+	req->pid=e->pid;
+    req->tgid=e->tgid;
+
+    memcpy(req->parent_comm,e->parent_comm,sizeof(e->parent_comm));
+	memcpy(req->comm,e->comm,sizeof(e->comm));
+	memcpy(req->args,e->args,sizeof(e->args));
+	memcpy(req->cmd,e->args[0],sizeof(e->args[0]));
+	req->argc=e->argc;
+	req->pinfo.task[0].pid=e->pinfo.task[0].pid;
+	memcpy(req->pinfo.task[0].comm,e->pinfo.task[0].comm,sizeof(e->pinfo.task[0].comm));
+	req->cwdlen=strlen(req->comm);
+	req->cmdlen=strlen(req->cmd);
+
+	if (msg_queue_full()) 
+		return 0;
+	
 	kexec_msg_queue_push(req);
+
     return 0;
 }
 
@@ -469,21 +517,34 @@ static int handle_taskreq_ringbuf_event(void *ctx, void *data, size_t data_sz) {
 #define ENGINE_FAIL 2 //已经报告引擎初始化失败，不重复报
 void *kexec_msgd(void *ptr)
 {
-#if 0
-	int reported = 0, engine_on = 0;
-	struct nlmsghdr *nlh = NULL;
-	taskreq_t *req = NULL;
-#else
-#endif
-
 	prctl(PR_SET_NAME, "process_mq");
 	save_thread_pid("kexec_msgd", SNIPER_THREAD_KEXECMSG);
 
 	kexec_msg_queue_init();
 
-	struct bpf_object *execve_program_obj = NULL;
-	struct bpf_map *taskreq_ringbuf_map = NULL;
-	struct ring_buffer *taskreq_ringbuf = NULL;
+	printf("kexec_msgd thread start...\r\n");
+
+	// Bump RLIMIT_MEMLOCK to create BPF maps 
+	bump_memlock_rlimit3();
+
+	// get_bpf_object
+	struct bpf_object *proc_program_obj = get_bpf_object(EBPF_EXECVE);
+	if (!proc_program_obj) printf("get_bpf_object@%s line:%d\r\n",__FILE__,__LINE__);
+
+	// bpf_object__find_map_by_name
+	struct bpf_map *p_ringbuf_map = bpf_object__find_map_by_name(proc_program_obj, "process_exc_ringbuf");
+	if (!p_ringbuf_map) printf("bpf_object__find_map_by_name@%s line:%d\r\n",__FILE__,__LINE__);
+
+	// bpf_map__fd
+	int ringbuf_map_fd =bpf_map__fd(p_ringbuf_map);
+	if (!ringbuf_map_fd<0) printf("bpf_map__fd[%d]@%s line:%d\r\n",ringbuf_map_fd,__FILE__,__LINE__);
+
+	// ring_buffer__new
+	struct ring_buffer *p_ringbuf3 = ring_buffer__new(ringbuf_map_fd, ringbuf_event3, NULL, NULL);
+	if (!p_ringbuf3){
+		printf("failed to create ringbuf@%s line:%d\r\n",__FILE__,__LINE__);
+		goto clean_up;
+	} 
 
 	while (Online) {
 		/* 许可到期/停止防护/引擎关闭，这边不做处理，由接收消息的地方处理 */
@@ -514,46 +575,13 @@ void *kexec_msgd(void *ptr)
 		// 	engine_on = 1;
 		// 	INFO("process engine on\n");
 		// }
-#else
-
-		if (!execve_program_obj) {
-			execve_program_obj = get_bpf_object(EBPF_EXECVE);
-			if (!execve_program_obj) {
-				sleep(1);
-				continue;
-			}
-		}
-		if (!taskreq_ringbuf) {
-			taskreq_ringbuf_map = bpf_object__find_map_by_name(execve_program_obj, "taskreq_ringbuf");
-			int ringbuf_map_fd = bpf_map__fd(taskreq_ringbuf_map);
-			taskreq_ringbuf = ring_buffer__new(ringbuf_map_fd, handle_taskreq_ringbuf_event, NULL, NULL);
-			if (!taskreq_ringbuf) {
-				sleep(1);
-				continue;
-			}
-		}
 #endif
 
-#if 0
-		/* 读取内核命令消息 */
-		req = (taskreq_t *)get_req(nlh, NLMSG_EXEC);
-		if (!req) {
-			continue;
-		}
-
-		/* 队列满则丢弃所有新消息 */
-		if (msg_queue_full()) {
-			continue;
-		}
-
-		/* 将核命令消息入消息队列 */
-		kexec_msg_queue_push(req);
-#else
-		int err = ring_buffer__poll(taskreq_ringbuf, 100 /* timeout, ms */);
+		int err = ring_buffer__poll(p_ringbuf3, 100 /* timeout, ms */);
 		if (err < 0) {
 			printf("Error polling taskreq_ringbuf: %d\n", err);
 		}	
-#endif
+
 		print_droped_msgs();
 	}
 
@@ -562,10 +590,12 @@ void *kexec_msgd(void *ptr)
 	if (nlh) {
 		sniper_free(nlh, NLMSGLEN, PROCESS_GET);
 	}
-#else
 #endif
 	kexec_msg_queue_destroy();
-
-	INFO("kexec_msgd thread exit\n");
+clean_up:
+	/* Clean up */
+	ring_buffer__free(p_ringbuf3);
+	bpf_object__close(proc_program_obj);
+	printf("kexec_msgd thread exit\n");
 	return NULL;
 }

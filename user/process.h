@@ -119,51 +119,53 @@ typedef struct task_status taskstat_t;
 extern taskstat_t *orphan_taskstat;
 extern taskstat_t *idle_taskstat;
 
-#define TASK_TTY		PSR_TTY		//0x1		带终端
-#define TASK_CRON		PSR_CRON	//0x2		定时任务
-#define TASK_NETWORK		PSR_NETWORK	//0x4		带网络
-#define TASK_EXEC		PSR_EXEC	//0x8		进程执行命令
-#define TASK_STOPED		PSR_STOPED	//0x10		危险命令已被阻断
+#define TASK_TTY		    PSR_TTY		    //0x1		带终端
+#define TASK_CRON		    PSR_CRON	    //0x2		定时任务
+#define TASK_NETWORK		PSR_NETWORK	    //0x4		带网络
+#define TASK_EXEC		    PSR_EXEC	    //0x8		进程执行命令
+#define TASK_STOPED		    PSR_STOPED	    //0x10		危险命令已被阻断
 #define TASK_KILLSNIPER		PSR_KILLSNIPER	//0x20		非法中断sniper
 #define TASK_DIRTYCOW		PSR_DIRTYCOW	//0x40		脏牛
-#define TASK_EXIT		PSR_EXIT	//0x80		进程退出
-#define TASK_PRIVUP		PSR_PRIVUP	//0x100		提权
+#define TASK_EXIT		    PSR_EXIT	    //0x80		进程退出
+#define TASK_PRIVUP		    PSR_PRIVUP	    //0x100		提权
 #define TASK_PRIVUP_FORK	PSR_PRIVUP_FORK	//0x200		提权态下fork
 #define TASK_PRIVUP_EXEC	PSR_PRIVUP_EXEC	//0x400		提权态下exec
 #define TASK_WEBSHELL		PSR_WEBSHELL	//0x800		菜刀  
 #define TASK_WEBEXECUTE_NORMAL	PSR_WEBEXECUTE_NORMAL	//0x1000	web中间件执行普通命令
 #define TASK_WEBEXECUTE_DANGER	PSR_WEBEXECUTE_DANGER	//0x2000	web中间件执行危险命令
-#define TASK_PIPEIN		PSR_PIPEIN	//0x4000	管道入方
-#define TASK_PIPEOUT		PSR_PIPEOUT	//0x8000	管道出方
-#define TASK_TRUST		PSR_TRUST	//0x10000	信任命令
-#define TASK_BLACK		PSR_BLACK	//0x20000	黑名单，或非白名单
-#define TASK_FILTER		PSR_FILTER	//0x40000	过滤命令
-#define TASK_DANGER		PSR_DANGER	//0x80000	危险命令
-#define TASK_MINER		PSR_MINER	//0x100000	挖矿命令
+#define TASK_PIPEIN		    PSR_PIPEIN	    //0x4000	管道入方
+#define TASK_PIPEOUT		PSR_PIPEOUT	    //0x8000	管道出方
+#define TASK_TRUST		    PSR_TRUST	    //0x10000	信任命令
+#define TASK_BLACK		    PSR_BLACK	    //0x20000	黑名单，或非白名单
+#define TASK_FILTER		    PSR_FILTER	    //0x40000	过滤命令
+#define TASK_DANGER		    PSR_DANGER	    //0x80000	危险命令
+#define TASK_MINER		    PSR_MINER	    //0x100000	挖矿命令
 #define TASK_DISK_READ		PSR_DISK_READ	//0x200000	读打开盘设备
 #define TASK_DISK_WRITE		PSR_DISK_WRITE	//0x400000	写打开盘设备
 #define TASK_WRITE_FORBIDDEN	PSR_WRITE_FORBIDDEN	//0x800000	禁止写
-#define TASK_ELF32		PSR_ELF32	//0x1000000	elf32格式命令
-#define TASK_AOUT		PSR_AOUT	//0x2000000	a.out格式命令
+#define TASK_ELF32		    PSR_ELF32	    //0x1000000	elf32格式命令
+#define TASK_AOUT		    PSR_AOUT	    //0x2000000	a.out格式命令
 #define TASK_RANSOMWARE		PSR_RANSOMWARE	//0x4000000	勒索软件
 #define TASK_PORT_FORWARD	PSR_PORT_FORWARD  //0x8000000	端口转发
 #define TASK_FAKE_SYSPROCESS	0x10000000	//伪造系统进程
-#define TASK_DOCKER		0x20000000	//docker内进程
+#define TASK_DOCKER		        0x20000000	//docker内进程
 #define TASK_ABNORMAL		PSR_ABNORMAL    //0x40000000	异常程序，如在/tmp目录下的程序
 #define TASK_DIRTYPIPE		PSR_DIRTYPIPE   //0x80000000    脏管道
+#define TASK_RequestMaliciousDomain		PSR_RequestMaliciousDomain  //请求恶意域名事件
 
-#define TASK_SU					  0x100000000	//su/sudo
-#define TASK_SUID		  		  0x200000000	//suid程序
-#define TASK_SHELL				  0x400000000	//shell
-#define TASK_REMOTE_EXECUTE			  0x800000000	//远程执行/反弹shell
-#define TASK_MAY_REMOTE_EXECUTE			  0x1000000000	//疑似远程执行/反弹shell
-#define TASK_REPORTED				  0x2000000000	//命令已报告管控中心
-#define TASK_DROP				  0x4000000000	//此类命令不报告管控中心
-#define TASK_DROPCHILD				  0x8000000000	//此类命令的子命令不报告管控中心
-#define TASK_PARENT_TTY				  0x10000000000	//父进程有TTY
-#define TASK_SSH				  0x20000000000	//是ssh登录或执行命令
-#define TASK_PARENT_BLACK			  0x40000000000	//父进程是违规进程
-#define TASK_PROGRAM_CHANGED			  0x80000000000 //程序在安装后被修改过
+
+#define TASK_SU					        0x100000000	    //su/sudo
+#define TASK_SUID		  		        0x200000000	    //suid程序
+#define TASK_SHELL				        0x400000000	    //shell
+#define TASK_REMOTE_EXECUTE			    0x800000000	    //远程执行/反弹shell
+#define TASK_MAY_REMOTE_EXECUTE			0x1000000000	//疑似远程执行/反弹shell
+#define TASK_REPORTED				    0x2000000000	//命令已报告管控中心
+#define TASK_DROP				        0x4000000000	//此类命令不报告管控中心
+#define TASK_DROPCHILD				    0x8000000000	//此类命令的子命令不报告管控中心
+#define TASK_PARENT_TTY				    0x10000000000	//父进程有TTY
+#define TASK_SSH				        0x20000000000	//是ssh登录或执行命令
+#define TASK_PARENT_BLACK			    0x40000000000	//父进程是违规进程
+#define TASK_PROGRAM_CHANGED			0x80000000000   //程序在安装后被修改过
 
 #define TASK_WEBEXECUTE (TASK_WEBEXECUTE_DANGER|TASK_WEBEXECUTE_NORMAL)
 #define TASK_TTYFLAGS	(TASK_TTY|TASK_PARENT_TTY|TASK_WEBSHELL|TASK_WEBEXECUTE|TASK_REMOTE_EXECUTE)

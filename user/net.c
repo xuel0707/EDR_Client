@@ -1,5 +1,5 @@
 #include "header.h"
-
+#include "net.h"
 time_t last_lockip_time = 0;
 struct sniper_ip last_honeyport_ip = {{0}};
 
@@ -1109,14 +1109,209 @@ static void int_to_ip(unsigned int addr, char *ip) {
 
 }
 
+
+static void send_net_msg(struct ebpf_netreq_t *req, struct net_msg_args *msg)
+{
+	cJSON *object = NULL, *arguments = NULL;
+	char uuid[S_UUIDLEN] = {0}, reply[REPLY_MAX] = {0}, *post = NULL;
+	
+	unsigned long event_time = 0;
+	int behavior = 0, level = 0, result = MY_RESULT_ZERO;
+
+	bool event = false;
+	char log_name[LOG_NAME_MAX] = {0};
+	char event_category[EVENT_NAME_MAX] = {0};
+	char log_category[LOG_NAME_MAX] = {0};
+	int terminate = 0;
+	char ipaddr_str[64];
+	char port_str[64] = {0};
+	if ((req->protocol==6)&&(strcmp(req->comm,"bash")==0))
+	{
+		req->type=NET_TCP_CONNECT_BASH;
+	}
+	if (req->protocol==1)
+	{
+		req->type=NET_ILLEGAL_CONNECT;
+	}
+	if ((req->protocol==6)&&(req->fin))
+	{
+		req->type=NET_MPORT_SCAN;
+	}
+
+	get_random_uuid(uuid);
+	if (uuid[0] == 0) {
+		return;
+	}
+
+	object = cJSON_CreateObject();
+	if (object == NULL) {
+		printf("cJSON Create Object failed@%s line:%d\r\n",__FILE__,__LINE__);
+		return;
+	}
+	arguments = cJSON_CreateObject();
+	if (arguments == NULL) {
+		printf("cJSON Create Object failed@%s line:%d\r\n",__FILE__,__LINE__);
+		cJSON_Delete(object);
+		return;
+	}
+	
+	switch (req->type) {
+
+		case NET_TCP_CONNECT_BASH:
+			strncpy(log_name, "ReverseShell", LOG_NAME_MAX);
+			strncpy(event_category, "Process", EVENT_NAME_MAX);
+			strncpy(log_category, "Process", LOG_NAME_MAX);
+			level = MY_LOG_HIGH_RISK;
+			behavior = MY_BEHAVIOR_ABNORMAL;
+			event = true;
+			terminate = MY_HANDLE_WARNING;
+
+			cJSON_AddStringToObject(object, "host_name", Sys_info.hostname);
+			cJSON_AddStringToObject(object, "ip_address", If_info.ip);
+			cJSON_AddStringToObject(object, "mac", If_info.mac);
+			
+			snprintf(ipaddr_str, sizeof(ipaddr_str), "%u.%u.%u.%u", 
+					(unsigned char)req->daddr,(unsigned char)((req->daddr)>>8),
+					(unsigned char)((req->daddr)>>16),(unsigned char)((req->daddr)>>24));
+			cJSON_AddStringToObject(arguments, "remote_ip", ipaddr_str);
+			snprintf(port_str, sizeof(port_str), "%u", req->dport);
+			cJSON_AddStringToObject(arguments, "remote_port", port_str);
+
+			snprintf(ipaddr_str, sizeof(ipaddr_str), "%u.%u.%u.%u", 
+					(unsigned char)req->saddr,(unsigned char)((req->saddr)>>8),
+					(unsigned char)((req->saddr)>>16),(unsigned char)((req->saddr)>>24));
+			cJSON_AddStringToObject(arguments, "local_ip", ipaddr_str);
+
+			snprintf(port_str, sizeof(port_str), "%u", req->sport);
+			cJSON_AddStringToObject(arguments, "local_port", port_str);
+
+			char uuid_str[64];
+			snprintf(uuid_str, sizeof(uuid_str), "%u", req->uid);
+			cJSON_AddStringToObject(arguments, "process_uuid", uuid_str);
+			cJSON_AddStringToObject(arguments, "process_name", req->comm);
+			cJSON_AddNumberToObject(arguments, "process_id", req->pid);
+			cJSON_AddNumberToObject(arguments, "parent_process_id", req->parent_pid);
+			cJSON_AddStringToObject(arguments, "parent_process_name", req->parent_comm);
+
+			char sessionid_str[64];
+			snprintf(sessionid_str, sizeof(sessionid_str), "%u", req->sessionid);
+			cJSON_AddStringToObject(arguments, "session_id", sessionid_str);
+			cJSON_AddStringToObject(arguments, "process_path", req->pathname);
+			cJSON_AddStringToObject(arguments, "parent_process_path", req->parent_pathname);
+
+			break;
+
+		case NET_ILLEGAL_CONNECT:
+			strncpy(log_name, "IllegalConnectInternet", LOG_NAME_MAX);
+			strncpy(event_category, "IllegalNetwork", EVENT_NAME_MAX);
+			strncpy(log_category, "Network", LOG_NAME_MAX);
+			level = MY_LOG_HIGH_RISK;
+			behavior = MY_BEHAVIOR_VIOLATION;
+			event = true;
+			terminate = MY_HANDLE_WARNING;
+
+			cJSON_AddStringToObject(object, "host_name", Sys_info.hostname);
+			cJSON_AddStringToObject(object, "ip_address", If_info.ip);
+			cJSON_AddStringToObject(object, "mac", If_info.mac);
+			cJSON_AddStringToObject(object, "log_type", log_name);
+			cJSON_AddStringToObject(object, "operating",  "Connect");
+			cJSON_AddNumberToObject(object, "event_type", 40);
+
+			snprintf(ipaddr_str, sizeof(ipaddr_str), "%u.%u.%u.%u", 
+					(unsigned char)req->daddr,(unsigned char)((req->daddr)>>8),
+					(unsigned char)((req->daddr)>>16),(unsigned char)((req->daddr)>>24));
+			cJSON_AddStringToObject(arguments, "local_ip", ipaddr_str);
+
+			snprintf(ipaddr_str, sizeof(ipaddr_str), "%u.%u.%u.%u", 
+					(unsigned char)req->saddr,(unsigned char)((req->saddr)>>8),
+					(unsigned char)((req->saddr)>>16),(unsigned char)((req->saddr)>>24));
+			cJSON_AddStringToObject(arguments, "remote_ip", ipaddr_str);
+			break;
+
+		case NET_MPORT_SCAN:
+			strncpy(log_name, "HoneyPort", LOG_NAME_MAX);
+			strncpy(event_category, "IllegalNetwork", EVENT_NAME_MAX);
+			strncpy(log_category, "Network", LOG_NAME_MAX);
+			level = MY_LOG_LOW_RISK;
+			behavior = MY_BEHAVIOR_ABNORMAL;
+			event = true;
+			terminate = MY_HANDLE_WARNING;
+
+			cJSON_AddStringToObject(object, "host_name", Sys_info.hostname);
+			cJSON_AddStringToObject(object, "ip_address", If_info.ip);
+			cJSON_AddStringToObject(object, "mac", If_info.mac);
+
+			snprintf(ipaddr_str, sizeof(ipaddr_str), "%u.%u.%u.%u", 
+					(unsigned char)req->saddr,(unsigned char)((req->saddr)>>8),
+					(unsigned char)((req->saddr)>>16),(unsigned char)((req->saddr)>>24));
+			cJSON_AddStringToObject(arguments, "attack_ip", ipaddr_str);
+
+			snprintf(ipaddr_str, sizeof(ipaddr_str), "%u.%u.%u.%u", 
+					(unsigned char)req->daddr,(unsigned char)((req->daddr)>>8),
+					(unsigned char)((req->daddr)>>16),(unsigned char)((req->daddr)>>24));
+			cJSON_AddStringToObject(arguments, "scan_ip", ipaddr_str);
+			cJSON_AddNumberToObject(arguments, "scan_port", req->dport);
+			cJSON_AddNumberToObject(arguments, "scan_count", 1);
+			cJSON_AddBoolToObject(arguments, "is_lock", true);
+			cJSON_AddNumberToObject(arguments, "lock_time", 60);
+			cJSON_AddNumberToObject(arguments, "scan_duration", 30);
+			cJSON_AddNumberToObject(arguments, "direction", 2);
+			cJSON_AddBoolToObject(arguments, "intranet", false);
+
+			break;
+			
+		default:
+			strncpy(log_name, "NetMonitor", LOG_NAME_MAX);
+			strncpy(event_category, "", EVENT_NAME_MAX);
+			/* 其余均为文件行为采集 */
+			level = MY_LOG_KEY;
+			behavior = MY_BEHAVIOR_ABNORMAL;
+			event = false;
+			terminate = MY_HANDLE_NO;
+	}
+
+	event_time = (msg->event_tv.tv_sec + serv_timeoff) * 1000 + (int)msg->event_tv.tv_usec / 1000;
+
+	cJSON_AddStringToObject(object, "id", uuid);
+	cJSON_AddStringToObject(object, "log_name", log_name);
+	cJSON_AddStringToObject(object, "log_category", log_category);
+	cJSON_AddStringToObject(object, "log_type", log_category);
+	cJSON_AddBoolToObject(object, "event", event);
+	cJSON_AddStringToObject(object, "event_category", event_category);
+	cJSON_AddNumberToObject(object, "level", level);
+	cJSON_AddNumberToObject(object, "behavior", behavior);
+	cJSON_AddNumberToObject(object, "result", result);
+	cJSON_AddNumberToObject(object, "terminate", terminate);
+	cJSON_AddStringToObject(object, "uuid", Sys_info.sku);
+	cJSON_AddNumberToObject(object, "os_type", OS_LINUX);
+	cJSON_AddStringToObject(object, "os_version", Sys_info.os_dist);
+	cJSON_AddNumberToObject(object, "timestamp", event_time);
+	cJSON_AddStringToObject(object, "source", "Agent");
+
+    cJSON_AddItemToObject(object, "arguments", arguments);
+
+	post = cJSON_PrintUnformatted(object);
+	if (!post) {
+		cJSON_Delete(object);
+		printf("cJSON_PrintUnformatted fail@%s line:%d\n",__FILE__,__LINE__);
+		return;
+	}
+
+	client_send_msg(post, reply, sizeof(reply), LOG_URL, "process");
+	// if (strcmp(log_name,"lllegalConnectInternet")==0)
+	// 	printf("post=%s,reply:[%s]\n",post,reply);
+	
+	cJSON_Delete(object);
+	free(post);
+
+	return;
+}
+
 /* net net monitor thread */
 void *net_monitor(void *ptr)
 {
-#if 0
-	netreq_t *req = NULL;
-#else
 	struct ebpf_netreq_t *req = NULL;
-#endif
+	struct net_msg_args msg = {0};
 	knet_msg_t *net_msg = NULL;
 	time_t last_internet_check_time = time(NULL);
     char daddr[32] = {0};
@@ -1126,8 +1321,6 @@ void *net_monitor(void *ptr)
 	save_thread_pid("network", SNIPER_THREAD_NETWORK);
 
 	check_lockedip(1);
-
-    printf("%-15s %-6s -> %-15s %-6s\n", "Src addr", "Port", "Dest addr", "Port");
 
 	while (Online) {
 
@@ -1223,11 +1416,8 @@ void *net_monitor(void *ptr)
 			sleep(1);
 			continue;
 		}
-#if 0
-		req = (netreq_t *)net_msg->data;
-#else
+
 		req = (struct ebpf_netreq_t *)net_msg->data;
-#endif
 		if (!req) {
 			continue;
 		}
@@ -1262,6 +1452,8 @@ void *net_monitor(void *ptr)
 		}
 #else
 #endif
+		
+		send_net_msg(req,&msg);
 	}
 	INFO("net thread exit\n");
 	return NULL;

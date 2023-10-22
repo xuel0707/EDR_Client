@@ -1,0 +1,27 @@
+---- EVENT_ServiceProcess Matches (26 in 9 files) ----
+common(6398).h (si\EDR_Client.si4project\Backup) line 206 : #define EVENT_ServiceProcess            0x1000 		// 服务进程事件
+ignore_cmdline_check in execve_hook.c (kern) : 		if (event_flag & EVENT_ServiceProcess) {
+ignore_cmdline_check in execve_hook.c (kern) : 			mypdebug3("EVENT_ServiceProcess ignore cmdline check\n");
+ignore_cmdline_check in execve_hook.c (kern) : 			mypdebug3("EVENT_ServiceProcess ignore cmdline check\n");
+check_plist_match in execve_hook.c (kern) : 			if (event_flag == EVENT_ServiceProcess) {
+check_webexecute in execve_hook.c (kern) : 	if (is_trust_cmd(req, EVENT_ServiceProcess, bprm, req->target_cmd)) {
+check_webexecute in execve_hook.c (kern) : 		req->trust_events |= EVENT_ServiceProcess;
+choose_process_event in process(2862).c (si\EDR_Client.si4project\Backup) : 				EVENT_ServiceProcess, LOG_LOW_RISK)) {
+report_webexec_danger in process(2862).c (si\EDR_Client.si4project\Backup) : 	if (req->trust_events & EVENT_ServiceProcess) {
+report_webexec in process(2862).c (si\EDR_Client.si4project\Backup) : 	if (req->trust_events & EVENT_ServiceProcess) {
+choose_process_event in process(3737).c (si\EDR_Client.si4project\Backup) : 				EVENT_ServiceProcess, LOG_LOW_RISK)) {
+report_webexec_danger in process(3737).c (si\EDR_Client.si4project\Backup) : 	if (req->trust_events & EVENT_ServiceProcess) {
+report_webexec in process(3737).c (si\EDR_Client.si4project\Backup) : 	if (req->trust_events & EVENT_ServiceProcess) {
+choose_process_event in process(5414).c (si\EDR_Client.si4project\Backup) : 				EVENT_ServiceProcess, LOG_LOW_RISK)) {
+report_webexec_danger in process(5414).c (si\EDR_Client.si4project\Backup) : 	if (req->trust_events & EVENT_ServiceProcess) {
+report_webexec in process(5414).c (si\EDR_Client.si4project\Backup) : 	if (req->trust_events & EVENT_ServiceProcess) {
+choose_process_event in process(5646).c (si\EDR_Client.si4project\Backup) : 				EVENT_ServiceProcess, LOG_LOW_RISK)) {
+report_webexec_danger in process(5646).c (si\EDR_Client.si4project\Backup) : 	if (req->trust_events & EVENT_ServiceProcess) {
+report_webexec in process(5646).c (si\EDR_Client.si4project\Backup) : 	if (req->trust_events & EVENT_ServiceProcess) {
+choose_process_event in process(7182).c (si\EDR_Client.si4project\Backup) : 				EVENT_ServiceProcess, LOG_LOW_RISK)) {
+report_webexec_danger in process(7182).c (si\EDR_Client.si4project\Backup) : 	if (req->trust_events & EVENT_ServiceProcess) {
+report_webexec in process(7182).c (si\EDR_Client.si4project\Backup) : 	if (req->trust_events & EVENT_ServiceProcess) {
+choose_process_event in process.c (user) : 				EVENT_ServiceProcess, LOG_LOW_RISK)) {
+report_webexec_danger in process.c (user) : 	if (req->trust_events & EVENT_ServiceProcess) {
+report_webexec in process.c (user) : 	if (req->trust_events & EVENT_ServiceProcess) {
+rule.c (user) line 41 : 	{ "ServiceProcess",		EVENT_ServiceProcess		}, //对外服务进程异常执行

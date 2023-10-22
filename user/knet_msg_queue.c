@@ -9,8 +9,8 @@
 #include <zlib.h>
 #include <pthread.h>
 #include <curl/curl.h>
-
 #include "header.h"
+#include <sys/resource.h> 
 
 static int knet_msg_queue_inited = 0;
 static struct list_head knet_msg_queue = {0};
@@ -46,33 +46,19 @@ static void knet_msg_queue_destroy(void)
 	pthread_mutex_destroy(&knet_msg_queue_lock);
 }
 
-#if 0
-static knet_msg_t *req2msg(netreq_t *req)
-#else
+
 static knet_msg_t *req2msg(struct ebpf_netreq_t *req)
-#endif
 {
-	knet_msg_t *msg = NULL;
+	knet_msg_t *msg  = sniper_malloc(sizeof(struct knet_msg), NETWORK_GET);
 
-	if (!req) {
-		return NULL;
-	}
-
-        msg = (knet_msg_t *)sniper_malloc(sizeof(struct knet_msg), NETWORK_GET);
 	if (!msg) {
 		MON_ERROR("malloc knet msg fail\n");
 		return NULL;
 	}
 
 	msg->datalen = sizeof(struct ebpf_netreq_t);
-	msg->data = sniper_malloc(msg->datalen, NETWORK_GET);
-	if (!msg->data) {
-		MON_ERROR("malloc knet msg databuf fail\n");
-		sniper_free(msg, sizeof(struct knet_msg), NETWORK_GET);
-		return NULL;
-	}
-	memset(msg->data, 0, msg->datalen);
-	memcpy(msg->data, req, msg->datalen);
+	msg->data = req;
+
 	msg->repeat = 0;
 
 	return msg;
@@ -153,17 +139,9 @@ static void add_knet_msg_queue_tail(knet_msg_t *msg)
 }
 
 /* push msg to queue */
-#if 0
-void knet_msg_queue_push(netreq_t *req)
-#else
 void knet_msg_queue_push(struct ebpf_netreq_t *req)
-#endif
 {
 	knet_msg_t *msg = NULL;
-
-	if (!req) {
-		return;
-	}
 
 	msg = req2msg(req);
 	if (!msg) {
@@ -197,98 +175,94 @@ knet_msg_t *get_knet_msg(void)
 	return msg;
 }
 
-static int handle_netreq_ringbuf_event(void *ctx, void *data, size_t data_sz) {
-    struct ebpf_netreq_t *req = data;
+void bump_memlock_rlimit2(void)
+{
+	struct rlimit rlim_new = {
+		.rlim_cur	= RLIM_INFINITY,
+		.rlim_max	= RLIM_INFINITY,
+	};
+
+	if(setrlimit(RLIMIT_MEMLOCK, &rlim_new)){
+		printf("Failed to increase RLIMIT_MEMLOCK limit@%s line:%d\r\n",__FILE__,__LINE__);
+		exit(1);
+	}
+}
+
+static int ringbuf_event2(void *ctx, void *data, size_t data_sz) {
+	const struct sock_event  *e=data;
+
+	struct ebpf_netreq_t *req=malloc(sizeof(struct ebpf_netreq_t));
+	if(!req) return -1;
+
+	memset(req,0,sizeof(struct ebpf_netreq_t));
+
+	req->uid=e->uid;
+    req->gid=e->gid;
+	req->pid=e->pid;
+    req->tgid=e->tgid;
+    req->net_type=e->net_type;
+
+	req->dport=e->dport;
+	req->daddr=e->daddr;
+	req->sport=e->sport;
+	req->saddr=e->saddr;
+	req->protocol=e->protocol;
+
+	req->sessionid=e->sessionid;
+    req->start_time=e->start_time;
+	req->parent_pid=e->parent_pid;
+	req->fin=e->fin;
+	req->syn=e->syn;
+	req->ack=e->ack;
+
+	memcpy(req->parent_pathname,e->parent_pathname,sizeof(e->parent_pathname));
+    memcpy(req->parent_comm,e->parent_comm,sizeof(e->parent_comm));
+    memcpy(req->pathname,e->pathname,sizeof(e->pathname));
+	memcpy(req->comm,e->comm,sizeof(e->comm));
 
 	if (msg_queue_full()) {
 		return 0;
 	}
 	knet_msg_queue_push(req);
+
     return 0;
 }
 
-#define MALLOC_FAIL 1
-#define ENGINE_FAIL 2
-#define NOTIFY_CC   4
+
 void *knet_msgd(void *ptr)
 {
-#if 0 
-	struct nlmsghdr *nlh = NULL;
-	int reported = 0, engine_on = 0;
-	netreq_t *req = NULL;
-#else
-#endif
-
 	prctl(PR_SET_NAME, "network_mq");
 	save_thread_pid("knet_msgd", SNIPER_THREAD_KNETMSG);
 
 	knet_msg_queue_init();
-	struct bpf_object *net_program_obj = NULL;
-	struct bpf_map *netreq_ringbuf_map = NULL;
-	struct ring_buffer *netreq_ringbuf = NULL;
+
+	printf("knet_msgd thread start...\r\n");
+
+	// Bump RLIMIT_MEMLOCK to create BPF maps 
+	bump_memlock_rlimit2();
+
+	// get_bpf_object
+	struct bpf_object *net_program_obj = get_bpf_object(EBPF_NET);
+	if (!net_program_obj) printf("get_bpf_object@%s line:%d\r\n",__FILE__,__LINE__);
+
+	// bpf_object__find_map_by_name
+	struct bpf_map *p_ringbuf_map = bpf_object__find_map_by_name(net_program_obj, "xdp_ringbuf");
+	if (!p_ringbuf_map) printf("bpf_object__find_map_by_name@%s line:%d\r\n",__FILE__,__LINE__);
+
+	// bpf_map__fd
+	int ringbuf_map_fd =bpf_map__fd(p_ringbuf_map);
+	if (!ringbuf_map_fd<0) printf("bpf_map__fd[%d]@%s line:%d\r\n",ringbuf_map_fd,__FILE__,__LINE__);
+
+	// ring_buffer__new
+	struct ring_buffer *p_ringbuf2 = ring_buffer__new(ringbuf_map_fd, ringbuf_event2, NULL, NULL);
+	if (!p_ringbuf2){
+		printf("failed to create ringbuf@%s line:%d\r\n",__FILE__,__LINE__);
+		goto clean_up;
+	} 
 
     while (Online) {
-#if 0
-		/* 许可到期/停止防护/引擎关闭，这边不做处理，由接收消息的地方处理 */
-		if (!nlh) {
-			nlh = (struct nlmsghdr *)sniper_malloc(NLMSGLEN, NETWORK_GET);
-			if (nlh == NULL) {
-				if (!(reported & MALLOC_FAIL)) {
-					MON_ERROR("knet_msgd malloc nlh fail\n");
-					reported |= MALLOC_FAIL;
-				}
-				/* TODO 报告管控中心 */
-				sleep(1);
-				continue;
-			}
-        	}
 
-		if (!engine_on) {
-			if (init_engine(NLMSG_NET, nlh) < 0) {
-				if (!(reported & ENGINE_FAIL)) {
-                        		MON_ERROR("net engine init fail\n");
-					reported |= ENGINE_FAIL;
-				}
-				/* TODO 报告管控中心 */
-				sleep(1);
-				continue;
-			}
-			engine_on = 1;
-                }
-
-		req = (netreq_t *)get_req(nlh, NLMSG_NET);
-		if (!req) {
-			continue;
-		}
-
-		/* 队列满则丢弃所有新消息 */
-		if (msg_queue_full()) {
-			continue;
-		}
-
-		knet_msg_queue_push(req);
-#else
-#endif
-
-		if (!net_program_obj) {
-			net_program_obj = get_bpf_object(EBPF_NET);
-			if (!net_program_obj) {
-				sleep(1);
-				continue;
-			}
-		}
-
-		if (!netreq_ringbuf) {
-			netreq_ringbuf_map = bpf_object__find_map_by_name(net_program_obj, "netreq_ringbuf");
-			int ringbuf_map_fd = bpf_map__fd(netreq_ringbuf_map);
-			netreq_ringbuf = ring_buffer__new(ringbuf_map_fd, handle_netreq_ringbuf_event, NULL, NULL);
-			if (!netreq_ringbuf) {
-				sleep(1);
-				continue;
-			}
-		}
-
-		int err = ring_buffer__poll(netreq_ringbuf, 100 /* timeout, ms */);
+		int err = ring_buffer__poll(p_ringbuf2, 100 /* timeout, ms */);
 		if (err < 0) {
 			printf("Error polling netreq_ringbuf: %d\n", err);
 		}	
@@ -296,16 +270,11 @@ void *knet_msgd(void *ptr)
 		print_droped_msgs();
 	}
 
-#if 0
-	fini_engine(NLMSG_NET, nlh);
-	if (nlh) {
-		sniper_free(nlh, NLMSGLEN, NETWORK_GET);
-	}
-#else
-#endif
-
 	knet_msg_queue_destroy();
-
-	INFO("knet_msgd thread exit\n");
+clean_up:
+	/* Clean up */
+	ring_buffer__free(p_ringbuf2);
+	bpf_object__close(net_program_obj);
+	printf("knet_msgd thread exit\n");
 	return NULL;
 }

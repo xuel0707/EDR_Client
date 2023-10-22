@@ -1,32 +1,32 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
-#define VER_LEN_MAX     40              /* 版本号最大长度 */
+#define VER_LEN_MAX     		40              /* 版本号最大长度 */
 
-#define WHILE_MAX       1000		/* 循环的最大次数 */
+#define WHILE_MAX       		1000			/* 循环的最大次数 */
 
 #define LOGID_SIZE_MAX          40
 #define SAMPLE_NUM_MAX          5
 
-#define LOGOUT_NEXT	0
-#define LOGOUT_NOW	1
+#define LOGOUT_NEXT				0
+#define LOGOUT_NOW				1
 
-#define MY_TURNON	1
-#define MY_TURNOFF	0
+#define MY_TURNON				1
+#define MY_TURNOFF				0
 
-#define HIDE_TURNON     MY_TURNON
-#define HIDE_TURNOFF    MY_TURNOFF
-#define OP_CREATE       1
-#define OP_DELETE       2
+#define HIDE_TURNON     		MY_TURNON
+#define HIDE_TURNOFF   			MY_TURNOFF
+#define OP_CREATE       		1
+#define OP_DELETE       		2
 
-#define BATCH_LOG_MODE  1  // 日志采集模式 1 批量打包上传
-#define SINGLE_LOG_MODE 2
+#define BATCH_LOG_MODE  		1  // 日志采集模式 1 批量打包上传
+#define SINGLE_LOG_MODE 		2
 
-#define STRLEN_MAX       1024
-#define USB_MAX          32
+#define STRLEN_MAX       		1024
+#define USB_MAX          		32
 
-#define KEY_LEN         40 //json数据key的长度
-#define SUFFIX_LEN      16 //下载的库后缀名的长度
+#define KEY_LEN         		40 //json数据key的长度
+#define SUFFIX_LEN      		16 //下载的库后缀名的长度
 
 extern int backup_space_full;
 extern int last_encrypt_enable;
@@ -45,10 +45,10 @@ typedef struct _POLICY_INT_LIST{
 }POLICY_INT_LIST, *PPOLICY_INT_LIST;
 
 /* usb.c */
-#define USB_NO          0
-#define USB_IN          1
-#define USB_OUT         2
-#define USB_CHANGE      3
+#define USB_NO          		0
+#define USB_IN          		1
+#define USB_OUT         		2
+#define USB_CHANGE      		3
 
 struct _mount_info{
 	int major;
@@ -91,7 +91,7 @@ typedef struct _GLOBAL_CONF{
 	int allow_upload_sample;                // 是否允许上传样本
 	int module_num;
 	int server_num;
-	PPOLICY_LIST licence_module;		//许可的模块
+	PPOLICY_LIST licence_module;			//许可的模块
 	PPOLICY_LIST server_ip;
 	pthread_rwlock_t lock;
 }GLOBAL_CONF, *PGLOBAL_CONF;
@@ -102,9 +102,9 @@ typedef struct _CONF_COLLECT_ITEMS {
 
 /* asset */
 typedef struct _ASSET_CONF {
-	int cycle;				// 周期  默认按天为单位  0 代表一次 1天 7天
+	int cycle;								// 周期  默认按天为单位  0 代表一次 1天 7天
 	int num;                                // collect_items的数量
-	unsigned int module_st;                 // 表示资产清点模块是否启用的bit
+	unsigned int module_st;                 // 表示资产清点模块是否启用的bit
 	PCONF_COLLECT_ITEMS collect_items;      //采集项 相对对主机信息采集部分
 	pthread_rwlock_t lock;
 }ASSET_CONF;
@@ -150,7 +150,7 @@ extern WEBSHELL_DETECT webshell_detect_global;
 extern int is_uninstall_global;
 extern int qr_status_global;
 extern int is_sync_global;
-extern int is_sync_once;     /* 配置更新时与is_sync_global值相同，只用在资产清点手动上报时执行一次 */
+extern int is_sync_once;     				/* 配置更新时与is_sync_global值相同，只用在资产清点手动上报时执行一次 */
 extern int client_mode_global;
 
 extern char client_ver_global[VER_LEN_MAX];

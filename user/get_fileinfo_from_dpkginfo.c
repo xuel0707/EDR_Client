@@ -238,7 +238,6 @@ int get_fileinfo_from_dpkginfo(char *cmd, exeinfo_t *exeinfo)
 	 */
 	if (lstat(cmd, &st) == 0 && S_ISLNK(st.st_mode) && realpath(cmd, path)) {
 		_cmd = path;
-printf("%s linkto %s\n", cmd, _cmd);
 	}
 	if (stat(_cmd, &st) == 0) {
 		/* dpkg没保存安装时的文件size/mode/mtime，就用当前的 */

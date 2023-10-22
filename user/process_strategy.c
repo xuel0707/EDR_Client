@@ -521,6 +521,7 @@ void close_kernel_process_rules(void)
 	struct kern_process_rules rule = {0};
 
 	if (prule.process_engine_on == 0) { //内核进程监控已关闭
+	    printf("file=%s,line=%d,prule.process_engine_on=%d\r\n",prule.process_engine_on,__FILE__,__LINE__);
 		return;
 	}
 
@@ -540,6 +541,7 @@ void close_kernel_process_rules(void)
 /* 更新内核模块的进程监控策略。调用者负责加进程策略写锁 */
 void update_kernel_process_rules(void)
 {
+	printf("Start to Update the kernel Rule...\n");
 	int enable = 0, terminate = 0, locking = 0, locking_time = 0;
 	int size = sizeof(struct kern_process_rules);
 	struct kern_process_rules new_prule = {0};
@@ -1027,6 +1029,17 @@ int is_trust_cmd(taskstat_t *taskstat)
 	}
 
 	pthread_rwlock_unlock(&rule_trust_global.lock);
+	return 0;
+}
+
+int is_RequestMaliciousDomain(taskstat_t *taskstat)
+{
+	if (strcmp(taskstat->cmd,"ping")==0) {
+		if(strstr(taskstat->args,"baidu.com")){
+			return 1;
+		}
+	}
+
 	return 0;
 }
 

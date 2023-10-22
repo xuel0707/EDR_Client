@@ -6,9 +6,10 @@ int check_open_write(char *pathname, struct parent_info *pinfo, int op_type, str
 	int ret = 0, sensitive_ret = 0, safe_ret = 0;
 
 	if (skip_file(safebasename(pathname))) {
+		printk("skip_file @%s line:%d\r\n",__FILE__,__LINE__);
 		return 0;
 	}
-
+	printk("check_open_write @%s line:%d\r\n",__FILE__,__LINE__);
 	check_abnormal_change(pathname, NULL, pinfo, op_type, inode);
 	check_logcollector(pathname, NULL, pinfo, op_type, inode);
 	check_usb_path(pathname, NULL, pinfo, op_type, inode, dev);

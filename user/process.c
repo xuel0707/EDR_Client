@@ -156,7 +156,7 @@ static proc_msg_t *build_process_msg(taskstat_t *taskstat)
 	taskstat_t *ptaskstat = NULL, tmp_taskstat = {0};
 
 	if (!taskstat) {
-		MON_ERROR("build msg fail, NULL taskstat\n");
+		printf("build msg fail, NULL taskstat@%s line:%d\n",__FILE__,__LINE__);
 		return NULL;
 	}
 
@@ -164,7 +164,6 @@ static proc_msg_t *build_process_msg(taskstat_t *taskstat)
 	ptaskstat = the_ptaskstat(taskstat);
 	if (!ptaskstat) {
 		pid_t ppid = taskstat->pinfo.task[0].pid;
-
 		/* 遇见过50多万个nv_queue内核线程的情况(NVIDIA)，故tasklist忽略内核线程，
 		   对于内核线程执行的命令，这里补上内核线程信息，允许上报 */
 		if (is_kernel_thread(ppid)) {
@@ -174,10 +173,8 @@ static proc_msg_t *build_process_msg(taskstat_t *taskstat)
 			get_proc_status(ptaskstat);
 			set_taskuuid(ptaskstat->uuid, ptaskstat->proctime, ppid, 0);
 			snprintf(ptaskstat->user, sizeof(ptaskstat->user), "root");
-		} else {
-			INFO("build msg fail, drop %s(%d). parent %s/%d, no ptaskstat.\n",
-			     taskstat->args, taskstat->pid, taskstat->pinfo.task[0].comm, ppid);
-
+		} 
+		else {
 			/* 父进程丢弃，子进程也丢弃 */
 			return NULL;
 		}
@@ -192,20 +189,20 @@ static proc_msg_t *build_process_msg(taskstat_t *taskstat)
 #endif
 
 	if (ptaskstat->uuid[0] == 0 || ptaskstat->cmd[0] == 0) {
-		MON_ERROR("build msg for %s(%d) fail. %s(%d) %s(%d) %s(%d). "
-			  "bad ptaskstat: pid %d, cmd %s, user %s, uuid %s\n",
+		printf("build msg for %s(%d) fail. %s(%d) %s(%d) %s(%d). "
+			  "bad ptaskstat: pid %d, cmd %s, user %s, uuid %s@%s line:%d\n",
 			  taskstat->args, taskstat->pid,
 			  taskstat->pinfo.task[0].comm, taskstat->pinfo.task[0].pid,
 			  taskstat->pinfo.task[1].comm, taskstat->pinfo.task[1].pid,
 			  taskstat->pinfo.task[2].comm, taskstat->pinfo.task[2].pid,
 			  ptaskstat->pid, ptaskstat->cmd,
-			  ptaskstat->user, ptaskstat->uuid);
+			  ptaskstat->user, ptaskstat->uuid,__FILE__,__LINE__);
 		return NULL;
 	}
 
 	msg = sniper_malloc(sizeof(proc_msg_t), PROCESS_GET);
 	if (!msg) {
-		MON_ERROR("build msg fail, no memory\n");
+		printf("build msg fail, no memory@%s line:%d\n",__FILE__,__LINE__);
 		return NULL;
 	}
 
@@ -213,6 +210,7 @@ static proc_msg_t *build_process_msg(taskstat_t *taskstat)
 	if (taskstat->stop_tv.tv_sec) {
 		msg->stop_tv = taskstat->stop_tv;
 	}
+	
 	msg->flags = taskstat->flags;
 	if (taskstat->flags & TASK_STOPED) { //内核里已阻断
 		msg->terminate = 1;
@@ -541,10 +539,10 @@ static void send_process_msg(proc_msg_t *msg, taskstat_t *taskstat, int debug)
 	int behavior = 0, level = 0, result = MY_RESULT_OK, terminate = MY_HANDLE_WARNING;
 	char uuid[S_UUIDLEN] = {0}, reply[REPLY_MAX] = {0}, *post = NULL;
 	cJSON *object = NULL, *arguments = NULL;
-	char *log_name = NULL, *event_category = "Process";
+	char *log_name = NULL, *event_category = "Process", *log_category = "Process";
 	char *opstr = "Created", *cmdname = NULL, *ip = NULL;
 	char port_str[64] = {0};
-
+	
 	if (!msg) {
 		return;
 	}
@@ -562,16 +560,17 @@ static void send_process_msg(proc_msg_t *msg, taskstat_t *taskstat, int debug)
 	if (msg->stop_tv.tv_sec) {
 		closed_time = (msg->stop_tv.tv_sec + serv_timeoff) * 1000 + msg->stop_tv.tv_usec / 1000;
 	}
-
+	
 	behavior = msg->behavior_id - 1;
 	if (strcmp(msg->result, failstr) == 0) {
 		result = MY_RESULT_FAIL;
 	}
-
+	
 	if (client_mode_global) { //学习模式或运维模式
 		msg->terminate = 0;
 		msg->blockip = 0;
 	}
+
 	if (msg->terminate) {
 		if (strcmp(msg->terminate_result, failstr) == 0) {
 			terminate = MY_HANDLE_BLOCK_FAIL;
@@ -585,7 +584,7 @@ static void send_process_msg(proc_msg_t *msg, taskstat_t *taskstat, int debug)
 	if (uuid[0] == 0) {
 		return;
 	}
-
+	
 	object = cJSON_CreateObject();
 	if (object == NULL) {
 		return;
@@ -595,9 +594,9 @@ static void send_process_msg(proc_msg_t *msg, taskstat_t *taskstat, int debug)
 		cJSON_Delete(object);
 		return;
 	}
-
+	
 	cJSON_AddStringToObject(object, "id", uuid);
-
+	
 	cJSON_AddStringToObject(arguments, "source_type", "Host");
 	switch (msg->event_id) {
 	case PROCESS_NORMAL:
@@ -763,6 +762,7 @@ static void send_process_msg(proc_msg_t *msg, taskstat_t *taskstat, int debug)
 			cJSON_AddStringToObject(arguments, "lock_ip", "");
 			cJSON_AddNumberToObject(arguments, "lock_duration", 0);
 		}
+
 		break;
 
 	case PROCESS_MBRWARE:
@@ -780,6 +780,18 @@ static void send_process_msg(proc_msg_t *msg, taskstat_t *taskstat, int debug)
 
 		opstr = "Update";
 		cJSON_AddStringToObject(arguments, "mbr_operating", opstr);
+
+		break;
+	
+	case PROCESS_REQ_MALI_DOMAIN:
+		log_name = "RequestMaliciousDomain";
+		log_category = "Domain";
+		event = true;
+		event_category = "MaliciousDomain ";
+		level = MY_LOG_HIGH_RISK;
+		behavior = 2;
+		result = MY_RESULT_ZERO;
+		opstr="Resolve"; 
 
 		break;
 
@@ -812,7 +824,7 @@ static void send_process_msg(proc_msg_t *msg, taskstat_t *taskstat, int debug)
 
 	cJSON_AddStringToObject(object, "log_name", log_name);
 	cJSON_AddStringToObject(object, "event_category", event_category);
-	cJSON_AddStringToObject(object, "log_category", "Process");
+	cJSON_AddStringToObject(object, "log_category", log_category);
 	  cJSON_AddBoolToObject(object, "event", event);
 	cJSON_AddNumberToObject(object, "level", level);
 	cJSON_AddNumberToObject(object, "behavior", behavior);
@@ -877,8 +889,8 @@ static void send_process_msg(proc_msg_t *msg, taskstat_t *taskstat, int debug)
 
 
 	/* 这里总按批量日志发，若为单发日志模式，client_send_msg会自动按单条日志发 */
-#if 0
-	client_send_msg(post, reply, sizeof(reply), LOG_URL, "process");
+#if 1
+	client_send_msg(post, reply, sizeof(reply), SINGLE_LOG_URL, "process");
 #else
 	// TODO(luoyinhong)
 	printf("client send msg: %s\n", post);
@@ -1650,6 +1662,7 @@ static void check_privup(taskstat_t *taskstat, int exec)
 			return;
 		}
 
+		printf("CMD is %s\n", cmd);
 		if (stat(cmd, &cmdst) < 0) {
 			MON_ERROR("check_privup stat %s fail: %s"
 				  "%s(%d) exec %s(%d)\n",
@@ -1731,6 +1744,7 @@ static void check_privup(taskstat_t *taskstat, int exec)
 	/* 没有SUID的提权视为非法提权 */
 	report_privup_post(taskstat, NULL, PRIVUP_NOSUID, &taskstat->event_tv);
 }
+
 static void check_privup_init(taskstat_t *taskstat)
 {
 	taskstat_t *ptaskstat = NULL;
@@ -2059,9 +2073,8 @@ int is_netsocket(char *filename)
 
 int skip_child(char *cmd)
 {
-	if (!cmd) {
+	if (!cmd) 
 		return 0;
-	}
 
 	if (strcmp(cmd, "cc") == 0 ||
 	    strcmp(cmd, "gcc") == 0 ||
@@ -2069,14 +2082,12 @@ int skip_child(char *cmd)
 	    strcmp(cmd, "man") == 0) {
 		return 1;
 	}
+
 	return 0;
 }
 
-#if 0
-static void init_taskstat_common(taskreq_t *req, taskstat_t *taskstat, unsigned long flags)
-#else
+
 static void init_taskstat_common(struct ebpf_taskreq_t *req, taskstat_t *taskstat, unsigned long flags)
-#endif
 {
 	int rpathlen = 0;
 	char *cmd = NULL, *args = NULL, *cwd = NULL;
@@ -2183,6 +2194,7 @@ static void init_taskstat_common(struct ebpf_taskreq_t *req, taskstat_t *tasksta
 	}
 #else
 	count_file_hash(taskstat);
+
 #endif
 
 #if 0
@@ -2317,44 +2329,38 @@ static taskstat_t *set_taskstat_exec(struct ebpf_taskreq_t *req)
 {
 	taskstat_t *taskstat = NULL;
 	pid_t pid = 0;
-
+	
 	if (!req) {
-		MON_ERROR("set_taskstat_exec fail, NULL rep\n");
+		printf("set_taskstat_exec fail, NULL @%s line:%d\n",__FILE__,__LINE__);
 		return NULL;
 	}
+
 	/* 检查taskreq的参数，argslen可能是0，这可能是shellcode */
 	/* cmdlen、argslen和cwdlen的数据类型是unsigned short，值不会小于0 */
 	if (req->cmdlen == 0 || req->cmdlen >= S_CMDLEN || req->argslen >= S_ARGSLEN ||
 	    req->cwdlen == 0 || req->cwdlen >= S_CWDLEN) {
 		/* 不打印args，防止错误的args可能导致core */
-		MON_ERROR("set_taskstat_exec fail, bad request "
-			  "cmdlen/argslen/cwdlen %d/%d/%d. pid %d\n",
-			  req->cmdlen, req->argslen, req->cwdlen, req->pid);
 		return NULL;
 	}
 
 	pid = req->pid;
+
 	/* 这里加写锁，避免其他线程取到值不完整的taskstat */
 	taskstat = get_taskstat_wrlock(pid, PROCESS_GET, req->proctime);
 	if (!taskstat) {
 		/* 进程第一次执行命令 */
 		taskstat = alloc_taskstat();
 		if (!taskstat) {
-			MON_ERROR("alloc taskstat for %s(%d) fail. "
-				  "%s(%d) %s(%d) %s(%d)\n",
-				  &req->args + req->cmdlen + 1, pid,
-				  taskstat->pinfo.task[0].comm, taskstat->pinfo.task[0].pid,
-				  taskstat->pinfo.task[1].comm, taskstat->pinfo.task[1].pid,
-				  taskstat->pinfo.task[2].comm, taskstat->pinfo.task[2].pid);
 			return NULL;
 		}
-
+	
 		init_taskstat_exec(req, taskstat);
 
 		add_tasklist_tail(taskstat);
 
 		return taskstat;
 	}
+	
 
 	list_del(&taskstat->list);
 	put_taskstat_unlock(taskstat);
@@ -2364,7 +2370,7 @@ static taskstat_t *set_taskstat_exec(struct ebpf_taskreq_t *req)
 
 	/* 更新taskstat */
 	init_taskstat_execplus(req, taskstat);
-
+	
 	//count_file_hash(taskstat); //在init_taskstat_common里做了
 	add_tasklist_tail(taskstat);
 
@@ -2503,6 +2509,14 @@ static void choose_process_event(proc_msg_t *msg, taskstat_t *taskstat, int init
 		return;
 	}
 
+	if (msg->flags & TASK_RequestMaliciousDomain) {
+		msg->event_id = PROCESS_REQ_MALI_DOMAIN;
+	}
+
+	if (msg->flags & TASK_PRIVUP) {
+		msg->event_id = PROCESS_PRIVILEGE_ESCALATION;
+	}
+
 	if (msg->flags & TASK_CRON) {
 		msg->event_id = PROCESS_SCHEDULE;
 	}
@@ -2518,21 +2532,21 @@ static void choose_process_event(proc_msg_t *msg, taskstat_t *taskstat, int init
 		return;
 	}
 
-        /*
-         * 选择事件的规则：
-         * 1、按危险程度顺序选择：高危、中危、低危、关键、普通
-         * 2、先选择命令本身性质的事件，再危险手段使用命令的事件:
-         *    挖矿、危险命令、webshell、中间件执行
-         * 3、被阻断则确定为该事件类型
-	 * 4、判断是否可信
-	 * 5、如果不是全局可信，要检查是否还命中其他事件
-         */
+	/*
+	* 选择事件的规则：
+	* 1、按危险程度顺序选择：高危、中危、低危、关键、普通
+	// * 2、先选择命令本身性质的事件，再危险手段使用命令的事件:
+	*    挖矿、危险命令、webshell、中间件执行
+	* 3、被阻断则确定为该事件类型
+	* 4、判断是否可信
+	* 5、如果不是全局可信，要检查是否还命中其他事件
+	*/
 
 	/*
-	 * 内核里阻断的进程，事件是确定的，下面中的一个:
-	 * PROCESS_WEBSHELL_EXECUTION, PROCESS_MIDDLE_EXECUTION,
-	 * PROCESS_MINERWARE, PROCESS_PORT_FORWARD, PROCESS_ABNORMAL
-	 */
+	* 内核里阻断的进程，事件是确定的，下面中的一个:
+	* PROCESS_WEBSHELL_EXECUTION, PROCESS_MIDDLE_EXECUTION,
+	* PROCESS_MINERWARE, PROCESS_PORT_FORWARD, PROCESS_ABNORMAL
+	*/
 	if (msg->flags & TASK_STOPED) {
 		msg->behavior_id = BEHAVIOR_ABNORMAL;
 		msg->terminate = 1;
@@ -3384,15 +3398,14 @@ static void report_process(taskstat_t *taskstat, int init_stage, int trust_event
 	if (taskstat->flags & TASK_DROP) {
 		return;
 	}
-
+	
 	msg = build_process_msg(taskstat);
 	if (!msg) {
 		return;
 	}
-
+	
 	trust_events |= is_trust_cmd(taskstat);
 	choose_process_event(msg, taskstat, init_stage, trust_events);
-
 	send_process_msg(msg, taskstat, 1);
 	sniper_free(msg, sizeof(proc_msg_t), PROCESS_GET);
 }
@@ -3776,11 +3789,9 @@ void *process_monitor(void *ptr)
 	int ret = 0;
 	pid_t ppid = 0;
 	taskstat_t *taskstat = NULL, *ptaskstat = NULL;
-#if 0
-	taskreq_t *req = NULL;
-#else
+
 	struct ebpf_taskreq_t *req = NULL;
-#endif
+
 	kexec_msg_t *exec_msg = NULL;
 	int last_process_check_status = 1;
 	time_t now = 0, last_check_time = 0;
@@ -3794,6 +3805,7 @@ void *process_monitor(void *ptr)
 		tasklist_need_report = 0;
 	}
 	process_inited = 1;
+	// printf("process_monitor thread starting...Online=%d\r\n",Online);
 
 	while (Online) {
 		if (exec_msg) {
@@ -3801,24 +3813,19 @@ void *process_monitor(void *ptr)
 			sniper_free(exec_msg, sizeof(struct kexec_msg), PROCESS_GET);
 		}
 
-		/* 检查待转储的日志文件 */
 		check_log_to_send("process");
 
-		/* 如果停止防护，什么也不做 */
 		if (sniper_process_loadoff == TURN_MY_ON) {
-			/* get_kexec_msg里不睡眠，所以此处要睡1秒，否则会显示CPU一直忙 */
 			sleep(1);
 			exec_msg = (kexec_msg_t *)get_kexec_msg();
 			continue;
 		}
 
-		/* 如果过期了/停止客户端工作，则什么也不做 */
 		if (conf_global.licence_expire || client_disable == TURN_MY_ON) {
 			close_kernel_process_rules();
 
 			sleep(STOP_WAIT_TIME);
 
-			/* 扔掉msg queue中的数据 */
 			while(1) {
 				exec_msg = (kexec_msg_t *)get_kexec_msg();
 				if (!exec_msg) {
@@ -3832,25 +3839,24 @@ void *process_monitor(void *ptr)
 			continue;
 		}
 
-		/* 如果功能关闭，什么也不做 */
 		if (!prule.process_engine_on) {
 			if (last_process_check_status) {
-                        	INFO("Turn process engine off\n");
+				printf("Turn process engine off@%s line:%d\r\n",__FILE__,__LINE__);
 				fini_psbuf(1);
-                        	last_process_check_status = 0;
+				last_process_check_status = 0;
 			}
 			sleep(1);
 			continue;
 		}
 
-		/* 如果功能重新打开，更新当前tasklist */
 		if (!last_process_check_status) {
-			INFO("Turn process engine on. renew tasklist\n");
+			printf("Turn process engine on. renew tasklist@%s line:%d\r\n",__FILE__,__LINE__);
 			init_psbuf();
-			INFO("tasklist renewed\n");
+			printf("Tasklist renewed@%s line:%d\r\n",__FILE__,__LINE__);
 			last_process_check_status = 1;
 			tasklist_need_report = 1;
 		}
+
 		if (tasklist_need_report && client_registered && !Heartbeat_fail) {
 			report_initps();
 			tasklist_need_report = 0;
@@ -3862,7 +3868,7 @@ void *process_monitor(void *ptr)
 			if (now < last_check_time) {
 				last_check_time = now;
 			}
-			/* 1分钟遍历一次已经结束的进程 */
+
 			if (now >= last_check_time + 60) {
 				check_exit_process();
 				check_process_event();
@@ -3872,25 +3878,26 @@ void *process_monitor(void *ptr)
 			sleep(1);
 			continue;
 		}
-#if 0
-		req = (taskreq_t *)exec_msg->data;
-#else
+		
 		req = (struct ebpf_taskreq_t *) exec_msg->data;
-		// printf("=== process.c ===\n");
-		// printf("EXEC process: %s(%d), nodename: %s(%u)\n", req->cmd, req->pid, req->nodename, req->mnt_id);
-		// printf("EXEC parent: %s(%d)\n", req->pinfo.task[0].comm, req->ppid);
-		// printf("EXEC cwd: %s\n", req->cwd);
-		// printf("EXEC tty: %s\n", req->tty);
-		// printf("EXEC argc: %d\n", req->argc);
-		// for (int i = 0; i < (req->argc > 2 ? 2 : req->argc) ; i++) {
-		// 	printf("EXEC arg%d: %s\n", i, req->args[i]);
-		// }
-		// printf("====================\n");
-#endif
 		if (!req) {
 			continue;
 		}
 
+		printf("[Sniper] Process:%s(%d) uid(%d), tgid(%d), filename is %s\n", req->cwd, req->pid, req->uid, req->tgid, req->cmd);
+
+		/* 忽略定时任务sniper_chk,assist_sniper_chk及子任务 */
+		if (strcmp(req->comm, "sniper_chk") == 0 ||
+			strcmp(req->comm, "assist_sniper_chk") == 0 ||
+			strcmp(req->comm, "webshell_detector") == 0 ) {
+			continue;
+		}
+		for (int i=0;i<4;i++) {
+			if (strcmp(req->pinfo.task[i].comm, "sniper_chk") == 0 ||
+				strcmp(req->pinfo.task[i].comm, "assist_sniper_chk") == 0) {
+				continue;
+			}
+		}
 #if 0
 		// ppid = req->pinfo.task[0].pid;
 		// ptaskstat = get_taskstat_nolock(ppid, PROCESS_GET);
@@ -3965,22 +3972,15 @@ void *process_monitor(void *ptr)
 		// }
 #else
 #endif
-
-#if 0
-		// taskstat = set_taskstat_exec(req);
-		if (!taskstat) {
-			continue;
-		}
-		taskstat->repeat = exec_msg->repeat;
-#else
-// TODO(luoyinhong)
+		
 		taskstat = set_taskstat_exec(req);
 		if (!taskstat) {
 			continue;
 		}
 		taskstat->repeat = exec_msg->repeat;
-		// taskstat->flags = 0;
-#endif
+		if (is_port_forward(taskstat, 0)) {
+			taskstat->flags |= TASK_PORT_FORWARD;
+		}
 
 #if 0
 		if (req->pflags.docker) {
@@ -4049,15 +4049,48 @@ void *process_monitor(void *ptr)
 			taskstat->flags &= ~TASK_DROP;
 		}
 #else
+		if (is_port_forward(taskstat, 0)) {
+			taskstat->flags |= TASK_PORT_FORWARD;
+		}
+
 		if (is_danger_cmd(taskstat->args)) {
 			taskstat->flags |= TASK_DANGER;
-			printf("danger taskstat %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
 		}
 		if (is_chopper_cmd(taskstat->args)) {
 			taskstat->flags |= TASK_WEBSHELL;
-			printf("chopper taskstat %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
 		}
+
+		if (strcmp(taskstat->cmd,"./badping")==0) {
+			taskstat->flags |= TASK_MINER;
+		}
+		if ((strcmp(req->comm,"suid")==0)){
+			taskstat->flags |= TASK_PRIVUP;
+			printf("suid@%s line:%d\r\n",__FILE__,__LINE__);
+		}
+		
+		if (prule.abnormal_on && taskstat->pflags.shell && taskstat->tty[0] &&
+		    taskstat->stop_tv.tv_sec == 0 && !(taskstat->flags & TASK_REMOTE_EXECUTE)) {
+			INFO("%s(%d, %s) is a shell, user %s/%d, tty %s\n",
+			     taskstat->cmd, taskstat->pid, taskstat->args,
+			     taskstat->user, taskstat->uid, taskstat->tty);
+			printf("%s(%d, %s) is a shell, user %s/%d, tty %s\n",
+			     taskstat->cmd, taskstat->pid, taskstat->args,
+			     taskstat->user, taskstat->uid, taskstat->tty);
+			if (!can_login(taskstat->uid)) {
+				INFO("%s(%d) user(%s/%d) cannot login, is an abnormal shell\n",
+				     taskstat->args, taskstat->pid, taskstat->user, taskstat->uid);
+				printf("%s(%d) user(%s/%d) cannot login, is an abnormal shell\n",
+				     taskstat->args, taskstat->pid, taskstat->user, taskstat->uid);
+				taskstat->flags |= TASK_ABNORMAL;
+				taskstat->pflags.shell_nologinuser = 1;
+			}
+		}
+
 #endif
+
+		set_taskstat_flags(taskstat, the_ptaskstat(taskstat));
+
+		check_privup_exec(taskstat);
 
 #if 0
 		//TODO 先过滤。check_privup_exec合并到report_process里？

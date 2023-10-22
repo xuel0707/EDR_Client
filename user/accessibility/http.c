@@ -347,6 +347,7 @@ int upload_file(char *filepath, char* url)
 		return -1;
 	}
 
+	printf("Starting upload the log information....\n");
 	if (http_upload_file(gz_path, url) < 0) {
 		unlink(gz_path);
 		return -1;

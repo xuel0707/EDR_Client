@@ -5,7 +5,7 @@
 
 #define PATH_MAX 4096 // need this bc we aren't including linux/limits.h
 #define S_CMDLEN 400
-#define P_GEN 4  // The Max Recursion times to get parent info
+#define P_GEN 8  // The Max Recursion times to get parent info
 
 #include "support_function.c"
 

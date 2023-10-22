@@ -1469,7 +1469,6 @@ int is_danger_cmd(char *cmd)
 
 	ptr = strstr(cmd, "/rm ");
 	if ((ptr && ptr + 3 == firstblank) || strncmp(cmd, "rm ", 3) == 0) {
-		printf("task args hit rm (danger_on: %d) ..., %s\n", prule.danger_on, cmd);
 		if (is_rm_sysdir(cmd, " /")     ||
 		    is_rm_sysdir(cmd, " /etc")  ||
 		    is_rm_sysdir(cmd, " /boot") ||
@@ -1523,13 +1522,14 @@ static int in_unexec_dirs(char *cmd, char *cwd)
                     strncmp(cmd, "/var/tmp/", 9) == 0) {
                         return 1;
                 }
-	} else {
+	} 
+	//else {
                 if (is_dir(cwd, "/tmp", 4) ||
                     is_dir(cwd, "/var/log", 8) ||
                     is_dir(cwd, "/var/tmp", 8)) {
                         return 1;
                 }
-	}
+	//}
 
 	return 0;
 }
@@ -1537,13 +1537,21 @@ static int in_unexec_dirs(char *cmd, char *cwd)
 /* 检测是否异常命令。返回0，正常；1，异常 */
 static int is_abnormal(taskstat_t *taskstat)
 {
+#if 0
 	if (!prule.abnormal_on || !taskstat || taskstat->flags & TASK_DOCKER) {
 		return 0;
 	}
 	if (taskstat->pid < RESERVED_PIDS) {
 		return 0;
 	}
-
+#else
+	if (!taskstat || taskstat->flags & TASK_DOCKER) {
+		return 0;
+	}
+	if (taskstat->pid < RESERVED_PIDS) {
+		return 0;
+	}
+#endif
 	/* 异常：在特殊目录下的命令 */
 	if (in_unexec_dirs(taskstat->cmd, taskstat->cwd)) {
 		return 1;
@@ -1926,6 +1934,10 @@ void set_taskstat_flags(taskstat_t *taskstat, taskstat_t *ptaskstat)
 		return;
 	}
 
+	if(is_RequestMaliciousDomain(taskstat)){
+		taskstat->flags |= TASK_RequestMaliciousDomain;
+	}
+
 	//if (pflags & TASK_WEBEXECUTE) {
 	//	taskstat->flags |= TASK_WEBEXECUTE;
 	//}
@@ -2128,6 +2140,7 @@ int is_kernel_thread(pid_t pid)
 	if (get_proc_ppid(pid) == 2) {
 		return 1;
 	}
+	
 	return 0;
 }
 

@@ -695,6 +695,8 @@ static int check_illegal_script(struct ebpf_filereq_t *rep, struct file_msg_args
 		}
 	}
 
+	printf("check_illegal_script  match [%d] @%s line:%d\r\n", match, __FILE__,__LINE__);
+
 	return match;
 }
 
@@ -1060,11 +1062,8 @@ int upload_file_sample(struct file_msg_args *msg, char *log_name, char *log_id, 
 
 	return ret;
 }
-#if 0
-static void send_file_msg(filereq_t *rep, struct file_msg_args *msg)
-#else
+
 static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
-#endif
 {
 	cJSON *object = NULL, *arguments = NULL;
 	char uuid[S_UUIDLEN] = {0}, reply[REPLY_MAX] = {0}, *post = NULL;
@@ -1158,8 +1157,9 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 
 	/* 匹配非法脚本 */
 	if (rep->type == F_ILLEGAL_SCRIPT &&
-		check_illegal_script(rep, msg, keyword) == 0) {
-		return;
+	 	check_illegal_script(rep, msg, keyword) == 0) {
+	// 	printf("check_illegal_script unmatch[%s] @%s line:%d\r\n", keyword, __FILE__,__LINE__);
+	 	return;
 	}
 
 	/* 匹配webshell文件检测 */
@@ -1196,11 +1196,12 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 					if (regex_revel < WEBSHELL_HIGH_LEVEL) {
 						return;
 					}
-				} else {
-					if (regex_revel == 0) {
-						return;
-					}
-				}
+				} 
+				//else {
+				//	if (regex_revel == 0) {
+				//		return;
+				//	}
+				//	}
 			} else {
 				snprintf(msg->webshell_rule_desc, STRLEN_MAX, "%s", thestring(abnormal_desc));
 			}
@@ -1208,7 +1209,7 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 			snprintf(msg->webshell_rule_desc, STRLEN_MAX, "%s", thestring(cloudwalker_desc));
 		}
 	}
-
+	
 	switch (rep->type) {
 		case F_SENSITIVE:
 			strncpy(log_name, "SensitiveFile", LOG_NAME_MAX);
@@ -1260,6 +1261,7 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 			behavior = MY_BEHAVIOR_NO;
 			event = false;
 			terminate = MY_HANDLE_NO;
+			printf("rep->type[%d]@%s line:%d\r\n",rep->type,__FILE__,__LINE__);
 			break;
 
 		case F_ABNORMAL:
@@ -1269,6 +1271,7 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 			behavior = MY_BEHAVIOR_NO;
 			event = false;
 			terminate = MY_HANDLE_NO;
+			printf("rep->type[%d]@%s line:%d\r\n",rep->type,__FILE__,__LINE__);
 			break;
 
 		case F_BINARY_FILTER:
@@ -1306,6 +1309,7 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 				terminate = MY_HANDLE_WARNING;
 			}
 			behavior = MY_BEHAVIOR_ABNORMAL;
+			printf("rep->type[%d]@%s line:%d\r\n",rep->type,__FILE__,__LINE__);
 			break;
 
 		case F_MIDDLE_SCRIPT:
@@ -1343,6 +1347,7 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 				terminate = MY_HANDLE_WARNING;
 			}
 			behavior = MY_BEHAVIOR_ABNORMAL;
+			printf("rep->type[%d]@%s line:%d\r\n",rep->type,__FILE__,__LINE__);
 			break;
 
 		case F_ILLEGAL_SCRIPT:
@@ -1417,6 +1422,7 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 				terminate = MY_HANDLE_WARNING;
 			}
 			behavior = MY_BEHAVIOR_ABNORMAL;
+			printf("rep->type[%d]@%s line:%d\r\n",rep->type,__FILE__,__LINE__);
 			break;
 
 		default:
@@ -1430,7 +1436,6 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 	}
 	log_name[LOG_NAME_MAX - 1] = '\0';
 	event_category[EVENT_NAME_MAX - 1] = '\0';
-
 
 	extension = get_path_types(msg->pathname);
 	event_time = (msg->start_tv.tv_sec + serv_timeoff) * 1000 + (int)msg->start_tv.tv_usec / 1000;
@@ -1495,9 +1500,9 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
         cJSON_AddItemToObject(object, "arguments", arguments);
 
 	post = cJSON_PrintUnformatted(object);
-	DBG2(DBGFLAG_FILE, "file post:%s\n", post);
-//	printf("file post:%s\n", post);
-	client_send_msg(post, reply, sizeof(reply), LOG_URL, "file");
+	// DBG2(DBGFLAG_FILE, "file post:%s\n", post);
+	// printf("file post:%s\n", post);
+	client_send_msg(post, reply, sizeof(reply), SINGLE_LOG_URL, "file");
 
 	cJSON_Delete(object);
 	free(post);
@@ -1667,7 +1672,7 @@ static void black_after_post_data(struct ebpf_filereq_t *rep, struct file_msg_ar
         cJSON_AddStringToObject(arguments, "filepath", msg->pathname);
 	cJSON_AddNumberToObject(arguments, "size", msg->file_size);
         cJSON_AddStringToObject(arguments, "extension", extension);
-        // cJSON_AddStringToObject(arguments, "md5", rep->md5);
+        cJSON_AddStringToObject(arguments, "md5", md5);
         cJSON_AddStringToObject(arguments, "new_filepath", msg->pathname_new);
         cJSON_AddNumberToObject(arguments, "operate_file_count", 1);
 	cJSON_AddStringToObject(arguments, "user", msg->username);
@@ -1765,6 +1770,486 @@ int check_to_report(char *path, struct ebpf_filereq_t *req)
 	return 1;
 }
 
+/* 对部分系统进程不做检测 */
+int skip_process(char *cmd)
+{
+	if(!cmd)
+		return -1;
+
+	/* 屏蔽系统自身类进程，减少日志 */
+	if (strcmp(cmd, "rsyslogd") == 0 ||
+	    strcmp(cmd, "anacron") == 0 ||
+	    strcmp(cmd, "dhclient") == 0 ||
+	    strcmp(cmd, "chronyd") == 0 ||
+	    strcmp(cmd, "gsd-color") == 0 ||
+	    strcmp(cmd, "gvfsd-metadata") == 0 ||
+	    strcmp(cmd, "dconf-service") == 0 ||
+	    strcmp(cmd, "gnome-shell") == 0 ||
+	    strcmp(cmd, "systemd") == 0 ||
+	    strcmp(cmd, "systemd-logind") == 0 ||
+	    strcmp(cmd, "systemd-journald") == 0 ||
+	    strcmp(cmd, "systemd-udevd") == 0) {
+		return 1;
+	}
+
+	/* 屏蔽防病毒程序 */
+	if (strcmp(cmd, "sniper_antivirus") == 0) {
+		return 1;
+	}
+
+	/*
+	 * 过滤系统logrotate进程操作备份日志的行为
+	 * 观察是否对其他功能造成影响，单独过滤
+	 */
+	if (strcmp(cmd, "logrotate") == 0) {
+		return 1;
+	}
+
+	return 0;
+}
+
+/* 过滤不需要监控的临时文件。返回1，不监控；0，监控 */
+int skip_file(struct ebpf_filereq_t *req) {
+	char *filename = safebasename(req->filename);
+	char *suffix = NULL;
+
+	if (!filename) {
+		return 1; //没有文件名，或文件名异常的不监控
+	}
+
+	/* 忽略vim产生的临时文件 */
+	if (strcmp(req->comm, "vim") == 0 || strcmp(req->comm, "vi") == 0) {
+		/* .viminfo或.viminf*.tmp */
+		if (strncmp(filename, ".viminf", 7) == 0) {
+			return 1;
+		}
+		/* vi通过创建名为4913的临时文件，来检测目录是否可写 */
+		if (strcmp(filename, "4913") == 0) {
+			return 1;
+		}
+
+		suffix = strrchr(filename, '.');
+		if (suffix) {
+			/* .xxxx.sw* */
+			if (filename[0] == '.' && strncmp(suffix, ".sw", 3) == 0) {
+				return 1;
+			}
+
+/* 此处不能屏蔽此类临时文件，vim操作文件会被过滤掉, 放到check_vim_change中处理 */
+#if 0
+			/* xxxx~ */
+			len = strlen(suffix);
+			if (suffix[len-1] == '~') {
+				return 1;
+			}
+#endif
+		}
+	}
+
+	/*
+	 * bash有三种输入重定向：<，<<，<<<
+	 * <<称为here-documents，<<<称为here-strings
+	 * 这两种重定向方式会产生临时文件/tmp/sh-thd-168841984或/tmp/sh-thd.EkN7Sr
+	 * 命令ls -l /proc/self/fd <<< 'TEST'可以演示此临时文件
+	 */
+	if (strncmp(filename, "/tmp/sh-thd", 11) == 0) {
+			return 1;
+	}
+
+	return 0;
+}
+
+/* For testing, To set type ""F_WEBSHELL_DETECT */
+int check_middle_match_webshell(char *filename) {
+
+	if (!filename)
+		return 0;
+
+	SENSITIVE_WEBSHELL_DETECT webshell_detect = protect_policy_global.sensitive_info.webshell_detect;
+	char *suffix = strrchr(filename, '.');
+	char tmp_suffix[32] = {0};
+	char dirname[S_DIRLEN] = {0};
+	int i;
+
+	safedirname(filename, dirname, S_DIRLEN);
+
+	// printf("filename is %s\n", req->filename);
+	// printf("suffix is %s\n", suffix);
+	// printf("webshell detect target num is %d\n", webshell_detect.target_num);
+	/* webshell检测目录及其子目录, 目录*代表全部监控 */
+	for (i = 0; i < webshell_detect.target_num; i++) {
+		if((strcmp(webshell_detect.target[i].path, "*") == 0) ||
+		   (webshell_detect.target[i].path != NULL &&
+		    webshell_detect.target[i].path[0] != '\0' &&
+		    strncmp(webshell_detect.target[i].path,
+				dirname, strlen(webshell_detect.target[i].path)) == 0) ||
+		   (webshell_detect.target[i].real_path != NULL &&
+		    webshell_detect.target[i].real_path[0] != '\0' &&
+		    strncmp(webshell_detect.target[i].real_path,
+				dirname, strlen(webshell_detect.target[i].real_path)) == 0)) {
+
+			/* 检测后缀名, 没有*通配符 */
+			if (suffix && strlen(suffix) > 1) {
+				snprintf(tmp_suffix, sizeof(tmp_suffix), "|%s|", suffix+1);
+				if (strstr(webshell_detect.target[i].extension, tmp_suffix) != NULL) {
+					return 1;
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+/* Detect webshell file */
+int check_middle_webshell(struct ebpf_filereq_t *req) {
+
+	SENSITIVE_WEBSHELL_DETECT webshell_detect = protect_policy_global.sensitive_info.webshell_detect;
+	if (webshell_detect.enable==0)
+		return 0;
+
+	int ret = 0;
+	check_middle_match_webshell(req->filename);
+	if (req->op_type == OP_RENAME && ret == 0)
+		ret = check_middle_match_webshell(req->new_filename);
+
+	return ret;
+
+}
+/* 检测是否匹配中间件脚本文件识别, 没有匹配到返回-1，匹配到返回0 */
+int check_middle_match_script_files(char *filename) {
+
+	// if (!filename)
+	// 	return -1;
+
+	MIDDLEWARE_MY_SCRIPT script_files = protect_policy_global.sensitive_info.middleware.script_files;
+	char *suffix = NULL;
+	char tmp_suffix[32] = {0};
+
+	suffix = strrchr(filename, '.');
+	if (script_files.ext != NULL) {
+		if (strstr(script_files.ext, "|*|") != NULL) {
+			return 0;
+		}
+
+		if (suffix && strlen(suffix) > 1) {
+			/* 检测后缀名, 没有*通配符 */
+			snprintf(tmp_suffix, sizeof(tmp_suffix), "|%s|", suffix+1);
+			if (strstr(script_files.ext, tmp_suffix) != NULL) {
+				return 0;
+			}
+		}
+	}
+
+	return -1;
+}
+
+/* 检测中间件脚本文件识别, 没有匹配到返回-1，匹配到返回0 */
+int check_middle_script_files(struct ebpf_filereq_t *req) {
+	MIDDLEWARE_MY_SCRIPT script_files = protect_policy_global.sensitive_info.middleware.script_files;
+	/* Terminate the Match when function switch is off. */
+	if (script_files.enable == 0)
+		return -1;
+
+	int ret = -1;
+	ret = check_middle_match_script_files(req->filename);
+	if (req->op_type == OP_RENAME && ret < 0)
+		ret = check_middle_match_script_files(req->new_filename);
+
+	return ret;
+}
+
+/* 检测是否匹配中间件可执行文件识别, 没有匹配到返回-1，匹配到返回0 */
+int check_match_middle_executable_files(char *filename) {
+
+	// if (!filename)
+	// 	return -1;
+	char *suffix = NULL;
+	char tmp_suffix[32] = {0};
+	MIDDLEWARE_EXECUTABLE executable_files = protect_policy_global.sensitive_info.middleware.executable_files;
+
+	suffix = strrchr(filename, '.');
+
+	/* 过滤开关开启后，不可以选择后缀名，全部要报 */
+	if (executable_files.exclude == 0) {
+		return 0;
+	}
+
+	/* 过滤开启后, 无后缀的文件始终报 */
+	if (suffix == NULL) {
+		return 0;
+	} 
+	else if (strlen(suffix) > 1) {
+		/* 检测后缀名, 没有*通配符 */
+		snprintf(tmp_suffix, sizeof(tmp_suffix), "|%s|", suffix+1);
+		if (strstr(executable_files.ext, tmp_suffix) == NULL) {
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
+int check_middle_executable_files(struct ebpf_filereq_t *req) {
+	int ret = -1;
+	MIDDLEWARE_EXECUTABLE executable_files = protect_policy_global.sensitive_info.middleware.executable_files;
+	/* Terminate the Match when function switch is off. */
+	if (executable_files.enable == 0)
+		return ret;
+	
+	ret = check_match_middle_executable_files(req->filename);
+	if (req->op_type == OP_RENAME && ret < 0) {
+		ret = check_match_middle_executable_files(req->new_filename);
+	}
+
+	return ret;
+}
+
+/* 检测是否匹配中间件目标进程, 没有匹配到返回-1，匹配到返回0 */
+int check_middle_targetcomm(struct ebpf_filereq_t *req) {
+	SENSITIVE_MIDDLEWARE middleware = protect_policy_global.sensitive_info.middleware;
+	char *target = middleware.target;
+
+	if (middleware.enable == 0)
+		return -1;
+
+	if (!req->filename || !target)
+		return -1;
+
+	if (req->op_type == OP_RENAME &&
+	    req->new_filename == NULL) {
+		return -1;
+	}
+	printf("middleware target is %s\n", target);
+
+	if (check_middle_executable_files(req) == 0) {
+		req->type = F_BINARY_FILTER;
+		printf("detect a executable files, comm is %s, filename is %s\n", req->comm, req->filename);
+	}
+	if (check_middle_script_files(req)==0) {
+		req->type = F_MIDDLE_SCRIPT;
+		printf("detect a script files, comm is %s, filename is %s\n", req->comm, req->filename);
+	}
+
+	return 0;
+}
+
+/* 获取匹配文件防篡改进程的结果, 没有匹配到返回-1，匹配到返回0 */
+static int get_match_fsafe_pro_result(char *fsafe_pro, char *comm)
+{
+	printf("debug here ccccccccccc");
+
+	/* 策略进程为空时，都是未授权的*/
+	if (fsafe_pro[0] == '\0') {
+		return -1;
+	}
+	/*
+	 * 对echo的单独处理会造成其他bash内置命令也过滤,
+	 * 考虑到实际使用场景，不对bash命令不做特殊处理
+	 */
+#if 0
+	/* echo 命令实际获取到的进程是bash */
+	if (strcmp(comm, "|bash|") == 0) {
+		if (strstr(fsafe_pro, "|echo|") != NULL ||
+		    strstr(fsafe_pro, "|bash|") != NULL) {
+			return 0;
+		}
+	} else {
+		if (strstr(fsafe_pro, comm) != NULL) {
+			return 0;
+		}
+	}
+#else
+	if (strstr(fsafe_pro, comm) != NULL) {
+		return 0;
+	}
+
+#endif
+	return -1;
+}
+
+/* 获取匹配文件防篡改的结果, 没有匹配到返回-1，匹配到返回0 */
+static int check_match_fsafe(struct ebpf_filereq_t* req) {
+
+	SENSITIVE_SAFE_FILE file_safe = protect_policy_global.sensitive_info.file_safe;
+
+	int num = file_safe.list_num;
+	printf("num is %d\n", num);
+
+	int i = 0;
+	char dirname[S_DIRLEN] = {0};
+	char *name = NULL;
+	char tmp_name[F_NAME_MAX] = {0};
+	char *ext = NULL;
+	char tmp_ext[F_NAME_MAX] = {0};
+	char tmp_process[80] = {0};
+	char operation[20] = {0};
+
+	if (num == 0 ||
+	    req->filename[0] == 0 ||
+	    req->comm[0] == 0) {
+		return -1;
+	}
+
+	safedirname(req->filename, dirname, S_DIRLEN);
+	name = safebasename(req->filename);
+	if (name == NULL) {
+		return -1;
+	}
+
+	/*
+	 * 有后缀的匹配后缀，例如|*.txt|
+	 * 没有后缀名的用||||匹配，
+	 * 如果只匹配||，防止策略中后缀名为空，
+	 * 传到内核拼接的字符串为||，反而匹配上了
+	 */
+	ext = strrchr(req->filename, '.');
+	if (ext && strlen(ext) > 2) {
+		snprintf(tmp_ext, sizeof(tmp_ext), "|*%s|", ext);
+	} else {
+		snprintf(tmp_ext, sizeof(tmp_ext), "||||");
+	}
+
+	snprintf(tmp_name, sizeof(tmp_name), "|%s|", name);
+	snprintf(tmp_process, sizeof(tmp_process), "|%s|", req->comm);
+
+	/* vfs_write 无法判断为创建还是修改，因此 2个动作有一个监控，都报 */
+	if (req->op_type == OP_OPEN_W) {
+		snprintf(operation, sizeof(operation), "|modify|");
+	} else if (req->op_type == OP_OPEN_C || req->op_type == OP_LINK){
+		snprintf(operation, sizeof(operation), "|add|");
+	} else if (req->op_type == OP_UNLINK){
+		snprintf(operation, sizeof(operation), "|delete|");
+	} else if (req->op_type == OP_RENAME){
+		snprintf(operation, sizeof(operation), "|modify|");
+	}
+
+	for (i = 0; i < num; i++) {
+
+		// printf("path is %s, name is %s\n", file_safe.list[i].path, file_safe.list[i].name);
+		// printf("dirname is %s, filename is %s\n", dirname, tmp_name);
+		/* 没有匹配路径 */
+		if (strncmp(file_safe.list[i].path, dirname, strlen(dirname)) != 0) {
+			continue;
+		}
+
+		/*
+		 * 文件名为空和*时均表示所有
+		 * 文件名可以全名匹配也可以类似*.ext这种通配符+后缀名匹配
+		 */
+		if (file_safe.list[i].name[0] != '\0' &&
+		    strstr(file_safe.list[i].name, "|*|") == NULL &&
+		    strstr(file_safe.list[i].name, tmp_name) == NULL &&
+		    strstr(file_safe.list[i].name, tmp_ext) == NULL) {
+			continue;
+		}
+
+		if (strstr(file_safe.list[i].operation, operation) == NULL) {
+			continue;
+		}
+
+		/* 进程名的匹配与其他条件相反，匹配到授权的进程不报，没有匹配到才报 */
+		if (get_match_fsafe_pro_result(file_safe.list[i].process, tmp_process) == 0) {
+			continue;
+		}
+		return 0;
+	}
+
+	return -1;
+}
+
+/* prevent file been modified */
+int check_safe(struct ebpf_filereq_t *req) {
+
+	SENSITIVE_SAFE_FILE file_safe = protect_policy_global.sensitive_info.file_safe;
+	if (file_safe.enable == 0) {
+		printf("safe switch is off...\n");
+		return -1;
+	}
+
+	int ret = check_match_fsafe(req);
+
+	return ret;
+
+}
+
+/* 获取匹配黑名单的结果, 没有匹配到返回-1，匹配到返回0 */
+static int get_match_fblack_after_result(struct ebpf_filereq_t* req) {
+	int i = 0;
+	char *name = NULL;
+	char tmp_name[F_NAME_MAX] = {0};
+	char *ext = NULL;
+	int ret = -1;
+	RULE_BLACK black_rule = rule_black_global;
+
+
+	name = safebasename(req->filename);
+	if (name == NULL) {
+		return -1;
+	}
+
+	ext = strrchr(req->filename, '.');
+	if (ext && strlen(ext) > 2) {
+		snprintf(tmp_name, sizeof(tmp_name), "*%s", ext);
+	} else {
+		snprintf(tmp_name, sizeof(tmp_name), "|.|");
+	}
+
+	for (i = 0; i < black_rule.file_num; i++) {
+
+		printf("black list: filepath is %s, filename is %s\n", black_rule.file[i].filepath, black_rule.file[i].filename);
+
+		/* 有路径且不匹配 */
+		if (black_rule.file[i].filepath[0] != '\0' &&
+		    strcmp(black_rule.file[i].filepath, req->filename) != 0) {
+			continue;
+		}
+
+		/* 文件名匹配或者名称带通配符不匹配 */
+		if (black_rule.file[i].filename[0] != '\0' &&
+		    (strcmp(black_rule.file[i].filename, name) == 0 ||
+		    strcmp(black_rule.file[i].filename, tmp_name) == 0)) {
+			ret = 0;
+			break;
+		}
+
+	}
+
+	return ret;
+
+}
+
+/* 黑名单文件检测 */
+int check_black_file_after(struct ebpf_filereq_t* req) {
+	int ret = 0, num = 0;
+	int terminate = 0;
+	char *path = NULL;
+
+	if (req->op_type == OP_RENAME &&
+	    req->new_filename[0] == 0) {
+		return 0;
+	}
+
+	// /* 学习模式下规则不生效 */
+	// if (client_mode == LEARNING_MODE) {
+	// 	return 0;
+	// }
+
+	if (req->op_type == OP_RENAME) {
+		path = req->new_filename;
+	} else {
+		path = req->filename;
+	}
+
+	ret = get_match_fblack_after_result(req);
+
+	if(ret < 0) {
+		return 0;
+	}
+
+	return 0;
+}
+
 void *file_monitor(void *ptr)
 {
 #if 0
@@ -1778,13 +2263,13 @@ void *file_monitor(void *ptr)
 	taskstat_t *taskstat = NULL;
 
 	get_job_list(print_job_old, &job_count_old);
-        printer_filesize = 0;
-        if (stat(LP_PATH, &sbuf) < 0) {
-                DBG2(DBGFLAG_FILE, "printer log file:%s is not exist\n", LP_PATH);
-        } else {
-                printer_filesize = sbuf.st_size;
-                printer_fileinode = sbuf.st_ino;
-        }
+	printer_filesize = 0;
+	if (stat(LP_PATH, &sbuf) < 0) {
+		DBG2(DBGFLAG_FILE, "printer log file:%s is not exist\n", LP_PATH);
+	} else {
+		printer_filesize = sbuf.st_size;
+		printer_fileinode = sbuf.st_ino;
+	}
 
 	prctl(PR_SET_NAME, "file_monitor");
 	save_thread_pid("file", SNIPER_THREAD_FILEMON);
@@ -1795,7 +2280,7 @@ void *file_monitor(void *ptr)
 			sniper_free(kfile_msg->data, kfile_msg->datalen, FILE_GET);
 			sniper_free(kfile_msg, sizeof(struct kfile_msg), FILE_GET);
 		}
-
+		
 		/* 检查待转储的日志文件 */
 		check_log_to_send("file");
 
@@ -1811,7 +2296,7 @@ void *file_monitor(void *ptr)
 		if (conf_global.licence_expire || client_disable == TURN_MY_ON) {
 			close_kernel_file_policy();
 
-                        sleep(STOP_WAIT_TIME);
+			sleep(STOP_WAIT_TIME);
 
 			/* 扔掉msg queue中的数据 */
 			while(1) {
@@ -1823,36 +2308,78 @@ void *file_monitor(void *ptr)
 				sniper_free(kfile_msg->data, kfile_msg->datalen, FILE_GET);
 				sniper_free(kfile_msg, sizeof(struct kfile_msg), FILE_GET);
 			}
-
-                        continue;
-                }
+			
+			continue;
+		}
 
 		kfile_msg = (kfile_msg_t *)get_kfile_msg();
 		if (!kfile_msg) {
 			sleep(1);
 			continue;
 		}
-#if 0
-		rep = (filereq_t *)kfile_msg->data;
-#else
+
 		rep = (struct ebpf_filereq_t *)kfile_msg->data;
-#endif
-		if (rep == NULL) {
+		if (!rep ) {
+			printf("kfile_msg->data is null @%s line:%d\r\n",__FILE__,__LINE__);
+			continue;
+		}
+		if (skip_process(rep->comm)==1) {
+			continue;
+		}
+		if (skip_file(rep)==1) {
 			continue;
 		}
 
-		DBG2(DBGFLAG_FILEDEBUG, "file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d\n", 
-			rep->pid, &(rep->args), &(rep->args) + rep->pro_len + 1, rep->type,rep->op_type,rep->uid);
-		printf("file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d\n", 
-			rep->pid, rep->comm, rep->filename , rep->type,rep->op_type,rep->uid);
+		if (rep->op_type == OP_RENAME &&
+			rep->new_filename[0] == 0) {
+			continue;
+		}
+		/* 忽略定时任务sniper_chk,assist_sniper_chk及子任务 */
+		if (strcmp(rep->comm, "sniper_chk") == 0 ||
+			strcmp(rep->comm, "assist_sniper_chk") == 0 ||
+			strcmp(rep->comm, "webshell_detector") == 0 ||
+			strcmp(rep->comm, "file_monitor") == 0 ) {
+			continue;
+		}
+		for (int i=0;i<4;i++) {
+			if (strcmp(rep->pinfo.task[i].comm, "sniper_chk") == 0 ||
+				strcmp(rep->pinfo.task[i].comm, "assist_sniper_chk") == 0) {
+				continue;
+			}
+		}
+
+		if (check_black_file_after(rep)==0) {
+			rep->type = F_BLACK_AFTER;
+			printf("detect a black file operation, comm is %s, filename is %s\n", rep->comm, rep->filename);
+		}
+
+		if (check_safe(rep)==0) {
+			rep->type = F_SAFE;
+			printf("detect a forbidden file operation, comm is %s, filename is %s\n", rep->comm, rep->filename);
+		}
+
+		check_middle_targetcomm(rep);
+		
+		if (check_middle_webshell(rep)==1) {
+			rep->type = F_WEBSHELL_DETECT;
+			printf("detect a php file operation, comm is %s, filename is %s\n", rep->comm, rep->filename);
+		}
 		memset(&msg, 0, sizeof(struct file_msg_args));
 		strncpy(msg.tty, rep->tty, S_TTYLEN);
 		msg.tty[S_TTYLEN-1] = 0;
 
-		/* 从进程获取不到task时，不用取父进程的task，自己赋值成员的值，以防后面用到process时不一致 */
 		taskstat = get_taskstat_rdlock(rep->pid, FILE_GET);
 		if (!taskstat) {
-			strncpy(msg.cmd, &rep->args, rep->pro_len);
+#if 0
+			strncpy(msg.cmd, &rep->args, sizeof(rep->args));
+#else
+			strncpy(msg.cmd, rep->args[0], 32);
+			for (int i = 0; i < rep->argc; i++) {
+				if (i > 0)
+					strncat(msg.args, " ", 2);
+				strncat(msg.args, rep->args[i], 32);
+			}
+#endif
 			msg.cmd[S_CMDLEN-1] = 0;
 			if (msg.tty[0] != 0) {
 				get_session_uuid(msg.tty, msg.session_uuid);
@@ -1870,30 +2397,31 @@ void *file_monitor(void *ptr)
 
 		msg.pid = rep->pid;
 		msg.proctime = rep->proctime;
-		memcpy(&msg.start_tv, &rep->event_tv, sizeof(struct timeval));
-#if 0
-		if (rep->type != F_PRINTER && rep->type != F_CDROM) {
-			strncpy(msg.pathname, &rep->args + rep->pro_len + 1, rep->path_len);
-			msg.pathname[PATH_MAX-1] = 0;
-			strncpy(msg.pathname_new, &rep->args + rep->pro_len + rep->path_len + 2, rep->newpath_len);
-			msg.pathname_new[PATH_MAX-1] = 0;
-			if ((msg.pathname[0] == '\0') || (rep->path_len == 0)){
-//				MON_ERROR("filename is NULL\n");
-				continue;
-			}
-		}
-#else
+
+
+		gettimeofday(&msg.start_tv, NULL);
+		
+		if(strcmp(rep->comm,"touch")==0){
+			if(strstr(rep->filename,".php")) rep->type=F_ILLEGAL_SCRIPT;
+			if(strstr(rep->filename,".jsp")) rep->type=F_ILLEGAL_SCRIPT;
+			if(strstr(rep->filename,".as"))  rep->type=F_ILLEGAL_SCRIPT; 
+			if(strstr(rep->filename,".cdx")) rep->type=F_ILLEGAL_SCRIPT; 
+			if(strstr(rep->filename,".cer")) rep->type=F_ILLEGAL_SCRIPT;   
+			if(strstr(rep->filename,".cgi")) rep->type=F_ILLEGAL_SCRIPT;
+		} 
+				
 		if (rep->type != F_PRINTER && rep->type != F_CDROM) {
 			strncpy(msg.pathname, rep->filename, 64);
 			msg.pathname[PATH_MAX-1] = 0;
 			strncpy(msg.pathname_new, rep->new_filename, 64);
 			msg.pathname_new[PATH_MAX-1] = 0;
 			if ((msg.pathname[0] == '\0') || (rep->path_len == 0)){
-//				MON_ERROR("filename is NULL\n");
+				printf("filename is null @%s line:%d\r\n",__FILE__,__LINE__);
+				MON_ERROR("filename is NULL\n");				
 				continue;
 			}
 		}
-#endif
+
 		strncpy(msg.cmdname, safebasename(msg.cmd), S_CMDLEN);
 		msg.cmdname[S_CMDLEN-1] = 0;
 		strncpy(msg.p_cmdname, rep->parent_comm, S_COMMLEN);
@@ -1904,68 +2432,58 @@ void *file_monitor(void *ptr)
 		if (rep->op_type == OP_RENAME || rep->type == F_ENCRYPT_BACKUP) {
 			if ((msg.pathname_new[0] == '\0') || (rep->newpath_len == 0)){
 				DBG2(DBGFLAG_FILE, "newfilename is NULL\n");
+				printf("newfilename is null @%s line:%d\r\n",__FILE__,__LINE__);
 				continue;
 			}
 		}
 
-		/* 文件防篡改非授权进程创建文件日志会在此处被过滤，此处排除文件防篡改 */
-		/* 不能过滤 OP_OPEN_C和OP_LINK, 否则同一个文件只报第一个功能 */
 		if (rep->op_type == OP_OPEN_W && 
 		   (rep->type != F_BLACK_AFTER &&
 		    rep->type != F_SAFE &&
 		    rep->type != F_ENCRYPT)) {
 			if (!check_to_report(msg.pathname, rep)) {
 				DBG2(DBGFLAG_FILE, "check file msg to report, op_type:%d, type:%d\n", rep->op_type, rep->type);
+				printf("check file msg to report, op_type:%d, type:%d @%s line:%d\r\n",rep->op_type, rep->type,__FILE__,__LINE__);
 				continue;
 			}
 		}
 
-		// if (rep->did_exec) {
-		// 	set_taskuuid(msg.taskuuid, rep->proctime, rep->pid, 0);
-		// } else {
-		// 	int i = 0;
-		// 	struct task_simple_info *tinfo = NULL;
-
-		// 	for (i = 0; i < SNIPER_PGEN; i++) {
-		// 		tinfo = &(rep->pinfo.task[i]);
-		// 		if (tinfo->did_exec) {
-		// 			set_taskuuid(msg.taskuuid,
-		// 				tinfo->proctime, tinfo->pid, 0);
-		// 			break;
-		// 		}
-		// 	}
-		// }
+		if(strcmp(rep->comm,"vim")==0){
+			rep->op_type = OP_OPEN_W;
+			if(strstr(rep->filename,".php")) rep->type=F_ILLEGAL_SCRIPT;
+			if(strstr(rep->filename,".jsp")) rep->type=F_ILLEGAL_SCRIPT;
+			if(strstr(rep->filename,".as"))  rep->type=F_ILLEGAL_SCRIPT; 
+			if(strstr(rep->filename,".cdx")) rep->type=F_ILLEGAL_SCRIPT; 
+			if(strstr(rep->filename,".cer")) rep->type=F_ILLEGAL_SCRIPT;   
+			if(strstr(rep->filename,".cgi")) rep->type=F_ILLEGAL_SCRIPT;
+		} 
 
 		if (rep->type == F_CDROM) {
 			cdrom_terminate_post_data(&msg);
 		} else if (rep->type == F_BLACK_AFTER) {
-			black_after_post_data(rep,&msg);
+			black_after_post_data(rep,&msg); 
 		} else if (rep->type == F_ENCRYPT) {
 			report_encrypt_msg(rep, &msg);
-			/* 恢复被删的诱捕文件 */
 			if (strstr(msg.pathname, TRAP_FILE_NOHIDE) != NULL) {
 				create_file(msg.pathname);
 			}
-
 			if (strstr(msg.pathname_new, TRAP_FILE_NOHIDE) != NULL) {
 				create_file(msg.pathname_new);
 			}
 		} else if (rep->type == F_ENCRYPT_BACKUP) {
-			DBG2(DBGFLAG_ENCRYPT, "encrypt backup file:%s, md5:%s\n", msg.pathname, msg.pathname_new);;
+			DBG2(DBGFLAG_ENCRYPT, "encrypt backup file:%s, md5:%s\n", msg.pathname, msg.pathname_new);
 			add_record_to_encrypt_db(rep, &msg);
 		} else if (rep->type == F_ENCRYPT_REPORT) {
 			/* 恢复被删的诱捕文件 */
 			if (strstr(msg.pathname, TRAP_FILE_NOHIDE) != NULL) {
 				create_file(msg.pathname);
 			}
-
 			if (strstr(msg.pathname_new, TRAP_FILE_NOHIDE) != NULL) {
 				create_file(msg.pathname_new);
 			}
 		} else {
 			send_file_msg(rep, &msg);
 		}
-
 	}
 
 	INFO("file thread exit\n");

@@ -9,9 +9,9 @@
 #include <zlib.h>
 #include <pthread.h>
 #include <curl/curl.h>
-
 #include "msg_queue.h"
 #include "header.h"
+#include <sys/resource.h> 
 
 #define MALLOC_FAIL 1
 #define ENGINE_FAIL 2
@@ -58,7 +58,7 @@ void kfile_msg_queue_destroy(void)
 	pthread_mutex_destroy(&kfile_msg_queue_lock);
 }
 
-/* 报告消息队列满，丢弃新消息 */
+/* if message queue is full, dropping new message */
 static int file_msg_queue_full(void)
 {
 	int i = 0;
@@ -73,6 +73,7 @@ static int file_msg_queue_full(void)
 	if (droped_full_msgs == 1) {
 		INFO("full queue(%d msgs), drop new file msg\n",
 			kfile_msg_count);
+		printf("full queue(%d msgs), drop new file msg@%s line:%d\n",kfile_msg_count,__FILE__,__LINE__);
 		return 1;
 	}
 
@@ -85,6 +86,7 @@ static int file_msg_queue_full(void)
 	if (i >= report_dropfull_threshold) {
 		INFO("full queue(%d msgs), %d file msgs droped\n",
 			kfile_msg_count, i);
+		printf("full queue(%d msgs), %d file msgs droped@%s line:%d\n",kfile_msg_count, i,__FILE__,__LINE__);
 		last_droped_full_msgs = droped_full_msgs;
 		last_report_dropfull_time = now;
 	}
@@ -142,87 +144,50 @@ static kfile_msg_t *req2msg(filereq_t *req)
 #else
 static kfile_msg_t *req2msg(struct ebpf_filereq_t *req)
 {
-	kfile_msg_t *msg = NULL;
 
-	if (!req) {
-		return NULL;
-	}
-
-	msg = (kfile_msg_t *)sniper_malloc(sizeof(struct kfile_msg), FILE_GET);
-	if (msg == NULL) {
-		MON_ERROR("kfile_msgd malloc msg fail\n");
+	kfile_msg_t *msg = (kfile_msg_t *)sniper_malloc(sizeof(struct kfile_msg), FILE_GET);
+	if (!msg) {
+		printf("kfile_msg_t malloc fail @%s line:%d\n",__FILE__,__LINE__);
 		return NULL;
 	}
 
 	msg->datalen = sizeof(struct ebpf_filereq_t);
-	msg->data = sniper_malloc(msg->datalen, FILE_GET);
-	if (msg->data == NULL) {
-		MON_ERROR("kfile_msgd malloc databuf fail\n");
-		sniper_free(msg, sizeof(struct kfile_msg), FILE_GET);
-		return NULL;
-	}
 
-	memcpy(msg->data, req, msg->datalen);
+	msg->data = req;
 
 	return msg;
 }
 #endif
 
-/* 新获得的消息插入命令队列尾部 */
+/* add kfile msg to queue tail */
 static void add_kfile_msg_queue_tail(kfile_msg_t *msg)
 {
 	pthread_mutex_lock(&kfile_msg_queue_lock);
 	list_add_tail(&msg->list, &kfile_msg_queue);
 	kfile_msg_count++;
-	DBG2(DBGFLAG_TTT, "kfile get msg count:(%d)\n", kfile_msg_count);
 	pthread_mutex_unlock(&kfile_msg_queue_lock);
 }
 
 /* push msg to queue */
-#if 0
-void kfile_msg_queue_push(filereq_t *req)
-{
-	kfile_msg_t *msg = NULL;
-
-	if (!req) {
-		return;
-	}
-
-	msg = req2msg(req);
-	if (!msg) {
-		return;
-	}
-
-	/* 新的file消息插入队列尾部 */
-	add_kfile_msg_queue_tail(msg);
-}
-#else
 void kfile_msg_queue_push(struct ebpf_filereq_t *req)
-{
-	kfile_msg_t *msg = NULL;
-
-	if (!req) {
-		return;
-	}
-
-	msg = req2msg(req);
+{				
+	kfile_msg_t *msg = req2msg(req);
 	if (!msg) {
+		printf("msg is null @%s line:%d\r\n",__FILE__,__LINE__);
 		return;
 	}
 
-	/* 新的file消息插入队列尾部 */
+	/* add kfile msg to queue tail */
 	add_kfile_msg_queue_tail(msg);
 }
-#endif
 
 /* pop msg from queue */
 kfile_msg_t *get_kfile_msg(void)
 {
 	kfile_msg_t *msg = NULL;
 
-	if (!kfile_msg_queue_inited) {
+	if (!kfile_msg_queue_inited) 
 		return NULL;
-	}
 
 	pthread_mutex_lock(&kfile_msg_queue_lock);
 	if (!list_empty(&kfile_msg_queue)) {
@@ -238,117 +203,102 @@ kfile_msg_t *get_kfile_msg(void)
 	return msg;
 }
 
-static int handle_filereq_ringbuf_event(void *ctx, void *data, size_t data_sz) {
-    struct ebpf_filereq_t *req = data;
+void bump_memlock_rlimit(void)
+{
+	struct rlimit rlim_new = {
+		.rlim_cur	= RLIM_INFINITY,
+		.rlim_max	= RLIM_INFINITY,
+	};
 
-	if (file_msg_queue_full()) {
-		return 0;
+	if(setrlimit(RLIMIT_MEMLOCK, &rlim_new)){
+		printf("Failed to increase RLIMIT_MEMLOCK limit@%s line:%d\r\n",__FILE__,__LINE__);
+		exit(1);
 	}
-	kfile_msg_queue_push(req);
-    return 0;
 }
 
+static int ringbuf_event(void *ctx, void *data, size_t size) {
+
+	const struct fevent *e = data;
+
+	struct ebpf_filereq_t *req=malloc(sizeof(struct ebpf_filereq_t));
+	if(!req) return -1;
+
+	memset(req,0,sizeof(struct ebpf_filereq_t));
+	
+	req->pid=e->pid;
+	req->tgid=e->tgid;
+	req->uid=e->uid;
+	req->path_len=e->path_len;
+	req->pro_len=e->pro_len;
+	req->size=e->size;
+
+	memcpy(req->comm,e->comm,sizeof(e->comm));
+	memcpy(req->parent_comm,e->parent_comm,sizeof(e->parent_comm));
+	memcpy(req->filename,e->filename,sizeof(e->filename));
+	memcpy(req->tty,e->tty,sizeof(e->tty));
+	memcpy(req->args,e->args,sizeof(e->args));
+	memcpy(req->abs_path,e->abs_path,sizeof(e->abs_path));
+
+	// Only handle vim processes
+	if(strcmp(req->comm,"vim")!=0)
+		return 0;
+
+	if (file_msg_queue_full())
+		return 0;
+	
+	kfile_msg_queue_push(req);
+
+    return 0;
+}
 
 // TODO: Adapt to the ebpf ringbuf....
 void *kfile_msgd(void *ptr)
 {
-#if 0
-	struct nlmsghdr *nlh = NULL;
-	int reported = 0, engine_on = 0;
-	struct ebpf_filereq_t *req = NULL;
-#else
-#endif
-
 	prctl(PR_SET_NAME, "file_mq");
 	save_thread_pid("kfile_msgd", SNIPER_THREAD_KFILEMSG);
 
 	kfile_msg_queue_init();
 
-	struct bpf_object *file_program_obj = NULL;
-	struct bpf_map *filereq_ringbuf_map = NULL;
-	struct ring_buffer *filereq_ringbuf = NULL;
+	printf("kfile_msgd thread start...\r\n");
+
+	// Bump RLIMIT_MEMLOCK to create BPF maps 
+	bump_memlock_rlimit();
+
+	// get_bpf_object
+	struct bpf_object *file_bpf_obj = get_bpf_object(EBPF_FILE);
+	if (!file_bpf_obj) printf("get_bpf_object@%s line:%d\r\n",__FILE__,__LINE__);
+
+	// bpf_object__find_map_by_name
+	struct bpf_map *p_ringbuf_map = bpf_object__find_map_by_name(file_bpf_obj, "fileopen_ringbuf");
+	if (!p_ringbuf_map) printf("bpf_object__find_map_by_name@%s line:%d\r\n",__FILE__,__LINE__);
+
+	// bpf_map__fd
+	int ringbuf_map_fd =bpf_map__fd(p_ringbuf_map);
+	if (!ringbuf_map_fd<0) printf("bpf_map__fd[%d]@%s line:%d\r\n",ringbuf_map_fd,__FILE__,__LINE__);
+
+	// ring_buffer__new
+	struct ring_buffer *p_ringbuf = ring_buffer__new(ringbuf_map_fd, ringbuf_event, NULL, NULL);
+	if (!p_ringbuf){
+		printf("failed to create ringbuf@%s line:%d\r\n",__FILE__,__LINE__);
+		goto clean_up;
+	} 
 
 	while (Online) {
-		/* 许可到期/停止防护/引擎关闭，这边不做处理，由接收消息的地方处理 */
-#if 0
-		if (!nlh) {
-			nlh = (struct nlmsghdr *)sniper_malloc(NLMSGLEN, FILE_GET);
-			if (nlh == NULL) {
-				if (!(reported & MALLOC_FAIL)) {
-					MON_ERROR("kfile_msgd malloc nlh fail\n");
-					reported |= MALLOC_FAIL;
-				}
-				/* TODO 报告管控中心 */
-				sleep(1);
-				continue;
-			}
-		}
 
-		if (!engine_on) {
-			if (init_engine(NLMSG_FILE, nlh) < 0) {
-				if (!(reported & ENGINE_FAIL)) {
-					MON_ERROR("file engine init fail\n");
-					reported |= ENGINE_FAIL;
-				}
-				/* TODO 报告管控中心 */
-				sleep(1);
-				continue;
-			}
-			engine_on = 1;
-		}
-#else
-
-		if (!file_program_obj) {
-			file_program_obj = get_bpf_object(EBPF_FILE);
-			if (!file_program_obj) {
-				sleep(1);
-				continue;
-			}
-		}
-		if (!filereq_ringbuf) {
-			filereq_ringbuf_map = bpf_object__find_map_by_name(file_program_obj, "filereq_ringbuf");
-			int ringbuf_map_fd = bpf_map__fd(filereq_ringbuf_map);
-			filereq_ringbuf = ring_buffer__new(ringbuf_map_fd, handle_filereq_ringbuf_event, NULL, NULL);
-			if (!filereq_ringbuf) {
-				sleep(1);
-				continue;
-			}
-		}
-
-#endif
-
-#if 0
-		req = (ebpf_filereq_t *)get_req(nlh, NLMSG_FILE);
-		if (req == NULL) {
-			continue;
-		}
-
-		/* 队列满则丢弃所有新消息 */
-		if (file_msg_queue_full()) {
-			continue;
-		}
-
-		kfile_msg_queue_push(req);
-		print_droped_file_msgs();
-#else
-		int err = ring_buffer__poll(filereq_ringbuf, 100 /* timeout, ms */);
+		int err = ring_buffer__poll(p_ringbuf, 100 /* timeout, ms */);
 		if (err < 0) {
 			printf("Error polling filereq_ringbuf: %d\n", err);
-		}	
-#endif
+			goto clean_up;
+		}
 		print_droped_file_msgs();
-
 	}
 
-#if 0
-	fini_engine(NLMSG_FILE, nlh);
-	if (nlh) {
-			sniper_free(nlh, NLMSGLEN, FILE_GET);
-	}
-#else
-#endif
-        kfile_msg_queue_destroy();
+	kfile_msg_queue_destroy();
 
-	INFO("kfile_msgd thread exit\n");
+clean_up:
+	/* Clean up */
+	ring_buffer__free(p_ringbuf);
+	bpf_object__close(file_bpf_obj);
+	printf("kfile_msgd thread exit\n");
 	return NULL;
 }
