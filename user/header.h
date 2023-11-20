@@ -639,12 +639,14 @@ enum {
 };
 enum {
     EBPF_EXECVE_PROG = 0,
-	EBPF_FILE_OPEN_PROG = 1,
-	EBPF_FILE_CREATE_PROG = 2,
-	EBPF_FILE_RENAME_PROG = 3,
-	EBPF_FILE_LINK_PROG = 4,
-	EBPF_FILE_UNLINK_PROG = 5,
-	EBPF_NET_PROG = 6,
+	EBPF_FILE_CHDIR_PROG = 1,
+	EBPF_FILE_OPEN_PROG = 2,
+	EBPF_FILE_CREATE_PROG = 3,
+	EBPF_FILE_RENAME_PROG = 4,
+	EBPF_FILE_LINK_PROG = 5,
+	EBPF_FILE_UNLINK_PROG = 6,
+	EBPF_NET_SOCK_PROG = 7,
+	EBPF_NET_XDP_PROG = 8,
     EBPF_PROGRAMS_NUM,
 };
 extern int load_ebpf_program(void);
@@ -792,8 +794,9 @@ extern int get_proc_cmdline(pid_t pid, char *buf, int buflen);
 extern int is_kernel_thread(pid_t pid);
 extern taskstat_t *the_ptaskstat(taskstat_t *taskstat);
 extern int is_danger(taskstat_t *taskstat);
-extern int is_danger_cmd(char *cmd);
+extern int is_danger_cmd(taskstat_t *taskstat);
 extern int is_chopper_cmd(char *cmd);
+extern int is_miner_cmd(char *cmd);
 extern int is_abnormal(taskstat_t *taskstat);
 
 #if 0

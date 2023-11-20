@@ -33,7 +33,7 @@ typedef unsigned short int umode_t;
 struct my_timeval {
 	long tv_sec;    /* Seconds.  */
 	long tv_usec;   /* Microseconds.  */
-};
+};	
 
 struct task_simple_info {
 	uid_t uid;
@@ -64,11 +64,11 @@ struct taskreq_t {
 	unsigned short argc;         // the number of the arguments.
 	unsigned short options;      // the number of the arguments starting with "-".
 	unsigned int mnt_id;
-	struct parent_info pinfo;    // The parent processes information (Up to 4 generations).
+	struct parent_info pinfo;    // The parent processes information (Up to 8 generations).
 	struct file *exe_file;       // ???
 	char comm[16];
 	char tty[S_TTYLEN];
-	char nodename[S_NAMELEN+1];
+	char nodename[32];
 	char cmd[S_CMDLEN];
 	char cwd[S_CWDLEN];
 	char args[MAX_ARGS][32];           // Used to store the arguments.
@@ -96,15 +96,16 @@ struct filereq_t {
 	long long int file_size;
 	long long int newfile_size;
 	struct parent_info pinfo;    // The parent processes information (Up to 4 generations).
-	char filename[64];
+	long unsigned int i_ino;
+	char filename[128];
 	unsigned int path_len;
-	char new_filename[64];
+	char new_filename[128];
 	unsigned int newpath_len;
 	char pro_pathname[64];
 	unsigned int pro_len;
 	int terminate;               // Been Abandoned, used to Judge whether the Block is needed.
 	char tty[S_TTYLEN];
-	char nodename[S_NAMELEN+1];
+	char nodename[32];
 	// char cmd[S_CMDLEN];
 	// char cwd[S_CWDLEN];
 	char args[8][64];            // Used to store the arguments.
@@ -123,6 +124,36 @@ struct netreq_t {
 	unsigned char  containerid[32];
 	// char buf[512];
 
+};
+
+struct sock_event {
+	unsigned int uid; 
+	unsigned int gid;                        	
+	unsigned int pid;
+	unsigned int tgid;
+	unsigned int net_type;   
+	char comm[16]; 
+	char parent_comm[16]; 
+	unsigned int parent_pid;
+	unsigned char protocol; 
+	unsigned short res1: 4;
+	unsigned short doff: 4;
+	unsigned short fin: 1;
+	unsigned short syn: 1;
+	unsigned short rst: 1;
+	unsigned short psh: 1;
+	unsigned short ack: 1;
+	unsigned short urg: 1;
+	unsigned short ece: 1;
+	unsigned short cwr: 1;             
+	unsigned short dport;                       
+	unsigned short sport;  
+	unsigned int daddr;                      
+	unsigned int saddr;
+	unsigned int sessionid;
+	unsigned long start_time;
+	char pathname[64];
+	char parent_pathname[64];                         
 };
 
 struct sys_enter_execve_args{

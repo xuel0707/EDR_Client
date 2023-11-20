@@ -41,16 +41,16 @@
 //--------------Define the bpf_map data structure-------------
 
 struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, int);
-	__type(value, struct taskreq_t);
-} heap SEC(".maps");
-
-struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 1024*1024); /* 1024 KB */
 } filereq_ringbuf SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_LRU_HASH);
+	__uint(max_entries, 516 * 516);
+	__type(key, char[32]);   // container name
+	__type(value, char[128]); //container prefix path
+} container_prefix_map SEC(".maps");
 
 loff_t get_file_size(struct file *file) {
 	// struct inode *inode = file->f_inode;
@@ -135,6 +135,40 @@ int trace_inode_rename(struct sys_enter_file_rename_args *ctx) {
 	return 0;
 }
 
+SEC("tracepoint/syscalls/sys_enter_chdir")
+int enter_chdir(struct trace_event_raw_sys_enter *ctx) {
+
+	struct task_struct *current = bpf_get_current_task_btf();
+	char container_id[32] = {};
+	// bpf_probe_read_kernel(&aus, sizeof(aus), &knode->name);
+	bpf_probe_read_str(container_id, sizeof(container_id), current->cgroups->subsys[0]->cgroup->kn->name);
+
+	if (my_strncmp(container_id, "docker", 6) != 0) {
+		return 0;
+	}
+	bpf_printk("chdir container is %s", container_id);
+
+	// Store process/calling process details.
+	u64 pidtgid = bpf_get_current_pid_tgid();
+	// event->pid = pidtgid;      // pid is the first 32 bits
+	bpf_printk("chdir Pid is %d", pidtgid);
+
+	const char *path;
+	char container_prefix[128];
+	bpf_probe_read_kernel(&path, sizeof(path), &ctx->args[0]);
+	bpf_probe_read_user_str(container_prefix, sizeof(container_prefix), path);
+	bpf_printk("chdir container prefix is %s", container_prefix);
+
+	char *val_path = bpf_map_lookup_elem(&container_prefix_map, &container_id);
+
+	// bpf_printk("chdir va_path is %s", val_path);
+	if (!val_path){
+		bpf_map_update_elem(&container_prefix_map, &container_id, &container_prefix, BPF_ANY);
+		bpf_printk("chdir update va_path ");
+	}
+
+	return 0;
+}
 
 //---------------- LSM Hooks Below-------------------
 
@@ -206,10 +240,6 @@ int BPF_PROG(lsm_inode_permission, struct inode *inode, int mask, int ret) {
 SEC("lsm/file_open")
 int BPF_PROG(lsm_file_open, struct file *file, int ret) {
 
-	// bpf_printk("flags is %u", file->f_flags);
-	// if ((file->f_flags & 01) != 01)
-	// 	return 0;
-
 	// Judge whether the inode is legal.
 	if (IS_ERR(file->f_inode))
 		return 0;
@@ -274,7 +304,7 @@ int BPF_PROG(lsm_file_open, struct file *file, int ret) {
 
 	/* Get mnt_id and nodename */
 	req->mnt_id = get_mnt_id();
-	bpf_probe_read_str(req->nodename, sizeof(req->nodename), get_uts_name());
+	bpf_probe_read_str(req->nodename, sizeof(req->nodename), current->cgroups->subsys[0]->cgroup->kn->name);
 	bpf_printk("Mount namespace id: %u, nodename: %s", req->mnt_id, req->nodename);
 
 	bpf_ringbuf_submit(req, 0);
@@ -324,6 +354,7 @@ int BPF_PROG(lsm_file_create, struct inode *dir, struct dentry *dentry, umode_t 
 	// Get the mtime.
 	req->mtime_sec = dentry->d_inode->i_mtime.tv_sec;
 	req->mtime_nsec = dentry->d_inode->i_mtime.tv_nsec;
+	req->i_ino = dentry->d_inode->i_ino;
 
 	bpf_printk("bpf_ktime_get_ns time is %ld", bpf_ktime_get_ns());
 	bpf_printk("mtime_sec is %ld", req->mtime_sec);
@@ -343,7 +374,7 @@ int BPF_PROG(lsm_file_create, struct inode *dir, struct dentry *dentry, umode_t 
 
 	/* Get mnt_id and nodename */
 	req->mnt_id = get_mnt_id();
-	bpf_probe_read_str(req->nodename, sizeof(req->nodename), get_uts_name());
+	bpf_probe_read_str(req->nodename, sizeof(req->nodename), current->cgroups->subsys[0]->cgroup->kn->name);
 	bpf_printk("Mount namespace id: %u, nodename: %s", req->mnt_id, req->nodename);
 
 	bpf_ringbuf_submit(req, 0);
@@ -401,6 +432,7 @@ int BPF_PROG(lsm_file_link, struct dentry* old_dentry, struct inode* dir, struct
 	req->newfile_size = new_dentry->d_inode->i_size;
 	req->mtime_sec = new_dentry->d_inode->i_mtime.tv_sec;
 	req->mtime_nsec = new_dentry->d_inode->i_mtime.tv_nsec;
+	req->i_ino = new_dentry->d_inode->i_ino;
 
 	bpf_printk("bpf_ktime_get_ns time is %ld", bpf_ktime_get_ns());
 	bpf_printk("mtime_sec is %ld", req->mtime_sec);
@@ -420,7 +452,7 @@ int BPF_PROG(lsm_file_link, struct dentry* old_dentry, struct inode* dir, struct
 
 	/* Get mnt_id and nodename */
 	req->mnt_id = get_mnt_id();
-	bpf_probe_read_str(req->nodename, sizeof(req->nodename), get_uts_name());
+	bpf_probe_read_str(req->nodename, sizeof(req->nodename), current->cgroups->subsys[0]->cgroup->kn->name);
 	bpf_printk("Mount namespace id: %u, nodename: %s", req->mnt_id, req->nodename);
 
 	bpf_ringbuf_submit(req, 0);
@@ -472,6 +504,7 @@ int BPF_PROG(lsm_file_unlink, struct inode* dir, struct dentry* dentry, int ret)
 	req->file_size = dentry->d_inode->i_size;
 	req->mtime_sec = dentry->d_inode->i_mtime.tv_sec;
 	req->mtime_nsec = dentry->d_inode->i_mtime.tv_nsec;
+	req->i_ino = dentry->d_inode->i_ino;
 
 	bpf_printk("bpf_ktime_get_ns time is %ld", bpf_ktime_get_ns());
 	bpf_printk("mtime_sec is %ld", req->mtime_sec);
@@ -486,7 +519,7 @@ int BPF_PROG(lsm_file_unlink, struct inode* dir, struct dentry* dentry, int ret)
 
 	/* Get mnt_id and nodename */
 	req->mnt_id = get_mnt_id();
-	bpf_probe_read_str(req->nodename, sizeof(req->nodename), get_uts_name());
+	bpf_probe_read_str(req->nodename, sizeof(req->nodename), current->cgroups->subsys[0]->cgroup->kn->name);
 	bpf_printk("Mount namespace id: %u, nodename: %s", req->mnt_id, req->nodename);
 
 	bpf_ringbuf_submit(req, 0);
@@ -538,7 +571,7 @@ int BPF_PROG(lsm_file_rename, struct inode *old_dir, struct dentry *old_dentry,
 	req->newfile_size = new_dentry->d_inode->i_size;
 	req->mtime_sec = old_dir->i_mtime.tv_sec;
 	req->mtime_nsec = old_dir->i_mtime.tv_nsec;
-
+	req->i_ino = new_dentry->d_inode->i_ino;
 	// bpf_printk("bpf_ktime_get_ns time is %ld", bpf_ktime_get_ns());
 	// bpf_printk("mtime_sec is %ld", req->mtime_sec);
 	// bpf_printk("mtime_nsec is %ld", req->mtime_nsec);
@@ -557,7 +590,7 @@ int BPF_PROG(lsm_file_rename, struct inode *old_dir, struct dentry *old_dentry,
 
 	/* Get mnt_id and nodename */
 	req->mnt_id = get_mnt_id();
-	bpf_probe_read_str(req->nodename, sizeof(req->nodename), get_uts_name());
+	bpf_probe_read_str(req->nodename, sizeof(req->nodename), current->cgroups->subsys[0]->cgroup->kn->name);
 	bpf_printk("Mount namespace id: %u, nodename: %s", req->mnt_id, req->nodename);
 
 	bpf_ringbuf_submit(req, 0);

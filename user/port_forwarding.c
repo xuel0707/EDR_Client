@@ -324,6 +324,9 @@ int is_port_forward(taskstat_t *taskstat, int to_report_task_exit)
 	}
 
 	if (strcmp(cmdname, "socat") == 0) {
+		int tunnel_enable = protect_policy_global.process.tunnel.enable;
+		if (tunnel_enable == 0)
+			return 0;
 		return is_socat_port_forward(cmdline);
 	}
 

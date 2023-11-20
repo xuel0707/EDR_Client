@@ -306,6 +306,45 @@ static int zip_msg(kexec_msg_t *msg)
 	return 0;
 }
 
+static void get_entire_filename(struct ebpf_taskreq_t *req) {
+	int is_container = 1;
+	int ret;
+	int file_inode;
+	struct stat file_stat;
+	char container_prefix[128] = {0};
+
+	if (strncmp(req->nodename, "docker", 6)!=0 ){
+		// printf("The file is from HOST\n");
+		return;
+	}
+	else {
+		// printf("The file is from Container!\nNodename is %s\n", file_data->nodename);
+		struct bpf_object *file_program_obj = NULL;
+		file_program_obj = get_bpf_object(EBPF_FILE_OBJ);
+		if (!file_program_obj) {
+			printf("can't find the ebpf file program\n");
+			return;
+		}
+		struct bpf_map *file_map = bpf_object__find_map_by_name(file_program_obj, "container_prefix_map");
+		int file_map_fd = bpf_map__fd(file_map);
+		memset(container_prefix, 0, sizeof(container_prefix));
+		ret = bpf_map_lookup_elem(file_map_fd, req->nodename, container_prefix);
+		if (ret!=0) {
+			printf("No prefix value been found...\n");
+			return ;
+		}
+		// printf("prefix is %s\nfilename is %s\n", container_prefix, req->cmd);
+		strncat(container_prefix, req->cmd, sizeof(container_prefix)-strlen(container_prefix)-1);
+		// container_prefix[sizeof(container_prefix)-1] = 0;
+		strncpy(req->cmd, container_prefix, sizeof(req->cmd)-1);
+		req->cmd[sizeof(req->cmd)-1] = 0;
+		req->cmdlen = strlen(req->cmd);  // req->cmd is changed, so update cmdlen.
+		// printf("Last Filename is %s\n", req->cmd);
+		return;
+
+	}
+}
+
 /* 将内核命令请求封装成命令消息 */
 #if 0
 static kexec_msg_t *req2msg(taskreq_t *req)
@@ -360,6 +399,7 @@ static kexec_msg_t *req2msg(struct ebpf_taskreq_t *req)
 	memset(msg->data, 0, msg->datalen);
 	memcpy(msg->data, req, msg->datalen);
 	msg->repeat = 0;
+	get_entire_filename((struct ebpf_taskreq_t *)msg->data);
 
 	return msg;
 }

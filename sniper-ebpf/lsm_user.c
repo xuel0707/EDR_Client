@@ -20,6 +20,7 @@ int handle_exec_event(void *ctx, void *data, size_t data_sz) {
     printf("EXEC process: %s(%d), nodename: %s(%u)\n", e->cmd, e->pid, e->nodename, e->mnt_id);
     printf("EXEC parent: %s(%d)\n", e->pinfo.task[0].comm, e->ppid);
     printf("EXEC cwd: %s\n", e->cwd);
+    printf("EXEC filename: %s\n", e->cmd);
     printf("EXEC tty: %s\n", e->tty);
     printf("EXEC argc: %d\n", e->argc);
     for (int i = 0; i < e->argc; i++) {
@@ -60,12 +61,12 @@ void int_to_ip(unsigned int addr, char *ip) {
 int handle_net_event(void *ctx, void *data, size_t data_sz) {
     const struct netreq_t *e = data;
 
-    char daddr[32] = {0};
-    char saddr[32] = {0};
-    int_to_ip(e->daddr, daddr);
-    int_to_ip(e->saddr, saddr);
+    // char daddr[32] = {0};
+    // char saddr[32] = {0};
+    // int_to_ip(e->daddr, daddr);
+    // int_to_ip(e->saddr, saddr);
 
-    printf("%-15s %-6d -> %-15s %-6d\n", saddr, e->sport, daddr, e->dport);
+    // printf("%-15s %-6d -> %-15s %-6d\n", saddr, e->sport, daddr, e->dport);
 
     // printf("Net daddr ip is %s\n", daddr);
     // printf("Net saddr ip is %s\n", saddr);
@@ -75,16 +76,19 @@ int handle_net_event(void *ctx, void *data, size_t data_sz) {
 
 struct bpf_link *tp_execve_link = NULL;
 struct bpf_link *tp_file_link = NULL;
-struct bpf_link *net_link = NULL;
+struct bpf_link *net_connect_link = NULL;
+struct bpf_link *net_xdp_link = NULL;
 
 void sig_handler(int signum) {
     int destroy_res = bpf_link__destroy(tp_execve_link);
     int destroy_res_file = bpf_link__destroy(tp_file_link);
-    int destroy_res_net = bpf_link__destroy(net_link);
+    int destroy_res_net_connect = bpf_link__destroy(net_connect_link);
+    int destroy_res_net_xdp = bpf_link__destroy(net_xdp_link);
 
     printf("bpf exec link destroy result: %d\n", destroy_res);
     printf("bpf file link destroy result: %d\n", destroy_res_file);
-    printf("bpf net link destroy result: %d\n", destroy_res_net);
+    printf("bpf net link destroy result: %d\n", destroy_res_net_connect);
+    printf("bpf net link destroy result: %d\n", destroy_res_net_xdp);
 
     printf("the program is over......\n");
     exit(0);
@@ -137,8 +141,10 @@ struct bpf_object *load_net_program(char *net_path) {
         return NULL;
     }
 
-    struct bpf_program *net_prog = bpf_object__find_program_by_name(net_obj, "tcp_connect");
-    net_link = bpf_program__attach(net_prog);
+    struct bpf_program *net_connect_prog = bpf_object__find_program_by_name(net_obj, "sample_socket_connect");
+    struct bpf_program *net_xdp_prog = bpf_object__find_program_by_name(net_obj, "sample_pkt_from_xdp");
+    net_connect_link = bpf_program__attach(net_connect_prog);
+    net_xdp_link = bpf_program__attach(net_xdp_prog);
 
     return net_obj;
 }
@@ -152,12 +158,12 @@ int main(int argc, char **argv) {
     //     return -1;
     // }
 
-    char file_path[PATH_MAX];
-    sprintf(file_path, "%s/ebpf_file_kern.o", dirname(argv[0]));
-    struct bpf_object* file_obj = load_file_program(file_path);
-    if (!file_obj){
-        return -1;
-    }
+    // char file_path[PATH_MAX];
+    // sprintf(file_path, "%s/ebpf_file_kern.o", dirname(argv[0]));
+    // struct bpf_object* file_obj = load_file_program(file_path);
+    // if (!file_obj){
+    //     return -1;
+    // }
 
     char net_path[PATH_MAX];
     sprintf(net_path, "%s/ebpf_net_kern.o", dirname(argv[0]));
@@ -175,37 +181,37 @@ int main(int argc, char **argv) {
     // int ringbuf_map_fd = bpf_map__fd(exec_event_ringbuf_map);
     // struct ring_buffer *exec_event_ringbuf = NULL;
     // exec_event_ringbuf = ring_buffer__new(ringbuf_map_fd, handle_exec_event, NULL, NULL);
-
     // if (!exec_event_ringbuf) {
     //     printf("Failed to create ring buffer\n");
     //     return -1;
     // }
 
-    struct bpf_map *file_event_ringbuf_map = bpf_object__find_map_by_name(file_obj, "filereq_ringbuf");
-    int file_ringbuf_map_fd = bpf_map__fd(file_event_ringbuf_map);
-    struct ring_buffer *file_event_ringbuf = NULL;
-    file_event_ringbuf = ring_buffer__new(file_ringbuf_map_fd, handle_file_event, NULL, NULL);
+    // struct bpf_map *file_event_ringbuf_map = bpf_object__find_map_by_name(file_obj, "filereq_ringbuf");
+    // int file_ringbuf_map_fd = bpf_map__fd(file_event_ringbuf_map);
+    // struct ring_buffer *file_event_ringbuf = NULL;
+    // file_event_ringbuf = ring_buffer__new(file_ringbuf_map_fd, handle_file_event, NULL, NULL);
 
-    if (!file_event_ringbuf) {
-        printf("Failed to create ring buffer\n");
-        return -1;
-    }
-
-    // struct bpf_map *net_event_ringbuf_map = bpf_object__find_map_by_name(net_obj, "netreq_ringbuf");
-    // int net_ringbuf_map_fd = bpf_map__fd(net_event_ringbuf_map);
-    // struct ring_buffer *net_event_ringbuf = NULL;
-    // net_event_ringbuf = ring_buffer__new(net_ringbuf_map_fd, handle_net_event, NULL, NULL);
-
-    // if (!net_event_ringbuf) {
+    // if (!file_event_ringbuf) {
     //     printf("Failed to create ring buffer\n");
     //     return -1;
     // }
 
+    struct bpf_map *net_event_ringbuf_map = bpf_object__find_map_by_name(net_obj, "net_event_ringbuf");
+    int net_ringbuf_map_fd = bpf_map__fd(net_event_ringbuf_map);
+    struct ring_buffer *net_event_ringbuf = NULL;
+    net_event_ringbuf = ring_buffer__new(net_ringbuf_map_fd, handle_net_event, NULL, NULL);
+
+    if (!net_event_ringbuf) {
+        printf("Failed to create ring buffer\n");
+        return -1;
+    }
+
     printf("receive from ring buf...\n");
     printf("%-15s %-6s -> %-15s %-6s\n", "Src addr", "Port", "Dest addr", "Port");
     while(1) {
-        ring_buffer__poll(file_event_ringbuf, 100 /* timeout, ms */);
-        // ring_buffer__poll(net_event_ringbuf, 100 /* timeout, ms */);
+        // ring_buffer__poll(exec_event_ringbuf, 100 /* timeout, ms */);
+        // ring_buffer__poll(file_event_ringbuf, 100 /* timeout, ms */);
+        ring_buffer__poll(net_event_ringbuf, 100 /* timeout, ms */);
     }
 
 

@@ -209,6 +209,7 @@ void init_serverconf(void)
 		}
 		localmode = 0;
 	}
+	printf("localmode is %d\n", localmode);
 }
 
 void init_assist_serverconf(void)

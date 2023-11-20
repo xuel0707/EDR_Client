@@ -406,10 +406,11 @@ static inline int get_base_info_taskreq(struct taskreq_t *req) {
 	struct task_struct *current = bpf_get_current_task_btf();
 
 	req->pid = bpf_get_current_pid_tgid();
+	req->ppid = current->real_parent->pid;
 	req->tgid = bpf_get_current_pid_tgid() >> 32 ;
-	req->proctime = current->start_boottime;
 	req->uid = bpf_get_current_uid_gid();
 	req->euid = current->real_cred->euid.val;
+	req->proctime = current->start_boottime;
 
 	// bpf_printk("pid is :%d", req->pid);
 	// bpf_printk("tgid is :%d", req->tgid);

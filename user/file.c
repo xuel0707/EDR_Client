@@ -589,6 +589,7 @@ static int check_black_after(char *md5)
 	int i = 0, num = 0;
 
 	if (md5 == NULL || md5[0] == '\0') {
+		printf("No file MD5 value! check black after Error...\n");
 		return -1;
 	}
 
@@ -602,9 +603,9 @@ static int check_black_after(char *md5)
 			break;
 		}
 
-
 	}
 	pthread_rwlock_unlock(&rule_black_global.lock);	
+	printf("1ret is %d\n", ret);
 
 	return ret;
 }
@@ -673,11 +674,82 @@ static int check_middle_binary(struct ebpf_filereq_t *rep, struct file_msg_args 
 
 	return match;
 }
+
+static int check_match_fillegal_script(char *filename) {
+	SENSITIVE_ILLEGAL_SCRIPT illegal_file_policy = protect_policy_global.sensitive_info.illegal_script;
+
+	int i = 0;
+	int num = illegal_file_policy.target_num;
+	char dirname[S_DIRLEN] = {0};
+	char *suffix = NULL;
+	char tmp_suffix[32] = {0};
+
+	if (num == 0 ||
+	    filename == NULL) {
+		return -1;
+	}
+
+	safedirname(filename, dirname, S_DIRLEN);
+	suffix = strrchr(filename, '.');
+
+	/* 非法脚本检测目录及其子目录, 目录*代表全部监控 */
+	for (i = 0; i < num; i++) {
+		if((strcmp(illegal_file_policy.target[i].path, "*") == 0) ||
+		   (illegal_file_policy.target[i].path != NULL &&
+		    illegal_file_policy.target[i].path[0] != '\0' &&
+		    strncmp(illegal_file_policy.target[i].path,
+				dirname, strlen(illegal_file_policy.target[i].path)) == 0) ||
+		   (illegal_file_policy.target[i].real_path != NULL &&
+		    illegal_file_policy.target[i].real_path[0] != '\0' &&
+		    strncmp(illegal_file_policy.target[i].real_path,
+				dirname, strlen(illegal_file_policy.target[i].real_path)) == 0)) {
+#if 0
+			/* 路径为*时, 后缀名也为*意味着所有文件都监控,负载会很高, 此处不允许后缀名为* */
+			if (strstr(fillegal_script[i].extension, "|*|") != NULL) {
+				return 0;
+			}
+#endif
+
+			/* 检测后缀名, 没有*通配符 */
+			if (suffix && strlen(suffix) > 1) {
+				snprintf(tmp_suffix, sizeof(tmp_suffix), "|%s|", suffix+1);
+				if (strstr(illegal_file_policy.target[i].extension, tmp_suffix) != NULL) {
+					// if (client_mode == NORMAL_MODE) {
+					// 	global_terminate = sniper_fpolicy.file_illegal_script_terminate;
+					// } else {
+					// 	global_terminate = 0;
+					// }
+					return 0;
+				}
+			}
+		}
+	}
+
+	return -1;
+}
+
 #if 0
 static int check_illegal_script(filereq_t *rep, struct file_msg_args *msg, char *keyword)
 #else
-static int check_illegal_script(struct ebpf_filereq_t *rep, struct file_msg_args *msg, char *keyword)
+static int check_illegal_script(struct ebpf_filereq_t *rep)
 #endif
+{
+	int enable = protect_policy_global.sensitive_info.illegal_script.enable;
+	if (enable==0)
+		return -1;
+
+	int match = -1;
+
+	match = check_match_fillegal_script(rep->filename);
+	/* 如果是重命名的情况，也要检测新的文件名 */
+	if (rep->op_type == OP_RENAME && match < 0) {
+		match = check_match_fillegal_script(rep->new_filename);
+	}
+
+	return match;
+}
+
+static int check_illegal_script_after(struct ebpf_filereq_t *rep, struct file_msg_args *msg, char *keyword)
 {
 	int match = 0;
 
@@ -1059,6 +1131,116 @@ int upload_file_sample(struct file_msg_args *msg, char *log_name, char *log_id, 
 
 	return ret;
 }
+
+static void send_container_escape_misconfig_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
+{
+	cJSON *object = NULL, *arguments = NULL;
+	char uuid[S_UUIDLEN] = {0}, reply[REPLY_MAX] = {0}, *post = NULL;
+	int terminate = 0, result = MY_RESULT_OK, defence_result = MY_RESULT_OK;
+	unsigned long event_time = 0;
+	struct defence_msg defmsg = {0};
+	bool event = false;
+	int level = 0;
+
+	get_random_uuid(uuid);
+	if (uuid[0] == 0) {
+		return;
+	}
+
+	event_time = (msg->start_tv.tv_sec + serv_timeoff) * 1000 + (int)msg->start_tv.tv_usec / 1000;
+
+	object = cJSON_CreateObject();
+	if (object == NULL) {
+		return;
+	}
+	arguments = cJSON_CreateObject();
+	if (arguments == NULL) {
+		cJSON_Delete(object);
+		return;
+	}
+
+	/* 可信时在内核terminate置为0，不发送防御日志 */
+	if (rep->terminate == 1) {
+		terminate = MY_HANDLE_BLOCK_OK;
+		result = MY_RESULT_FAIL;
+		defence_result = MY_RESULT_OK;
+	} else {
+		terminate = MY_HANDLE_WARNING;
+		result = MY_RESULT_OK;
+		defence_result = MY_RESULT_FAIL;
+	}
+
+
+	event = true;
+	level = MY_LOG_HIGH_RISK;
+
+	cJSON_AddStringToObject(object, "id", uuid);
+	cJSON_AddStringToObject(object, "log_name", "ContainerEscapeMisConfig");
+	cJSON_AddStringToObject(object, "log_category", "Process");
+	cJSON_AddBoolToObject(object, "event", event);
+	cJSON_AddStringToObject(object, "event_category", "ContainerEscape");
+	cJSON_AddNumberToObject(object, "level", level);
+	cJSON_AddNumberToObject(object, "behavior", MY_BEHAVIOR_ABNORMAL);
+	cJSON_AddNumberToObject(object, "result", result);
+	cJSON_AddStringToObject(object, "operating", "Created");
+	cJSON_AddNumberToObject(object, "terminate", terminate);
+	cJSON_AddStringToObject(object, "host_name", Sys_info.hostname);
+	cJSON_AddStringToObject(object, "ip_address", If_info.ip);
+	cJSON_AddStringToObject(object, "mac", If_info.mac);
+	cJSON_AddStringToObject(object, "uuid", Sys_info.sku);
+	cJSON_AddStringToObject(object, "user", msg->username);
+	cJSON_AddNumberToObject(object, "os_type", OS_LINUX);
+	cJSON_AddStringToObject(object, "os_version", Sys_info.os_dist);
+	cJSON_AddNumberToObject(object, "timestamp", event_time);
+	cJSON_AddStringToObject(object, "policy_id", policy_id_cur);
+	cJSON_AddNumberToObject(object, "operation_mode", client_mode_global);
+	cJSON_AddStringToObject(object, "source", "Agent");
+
+	// added container id
+	cJSON_AddStringToObject(arguments, "source_type", "Container");
+	// cJSON_AddContainerInfoToObject(arguments, rep->nodename);
+
+	// if (!msg->is_container) {
+	// 	INFO("container escape miconfig msg doesn't contain container ID! %s, %lu\n", rep->nodename, rep->mnt_id);
+	// }
+	cJSON_AddStringToObject(arguments, "process_uuid", msg->taskuuid);
+	cJSON_AddStringToObject(arguments, "process_name", msg->cmdname);
+	cJSON_AddNumberToObject(arguments, "process_id", msg->pid);
+	cJSON_AddNumberToObject(arguments, "thread_id", 0);
+	cJSON_AddStringToObject(arguments, "process_path", msg->cmd);
+	cJSON_AddStringToObject(arguments, "process_commandline", msg->args);
+
+	cJSON_AddStringToObject(arguments, "parent_process_name", msg->p_cmdname);
+
+	cJSON_AddStringToObject(arguments, "user", msg->username);
+	cJSON_AddStringToObject(arguments, "session_uuid", msg->session_uuid);
+	cJSON_AddStringToObject(arguments, "mis_config_file_name", msg->pathname);
+	cJSON_AddStringToObject(arguments, "mis_config_file_type", "Config_file");
+
+	cJSON_AddItemToObject(object, "arguments", arguments);
+
+	post = cJSON_PrintUnformatted(object);
+	DBG2(DBGFLAG_FILE, "file escape misconfig post:%s\n", post);
+	client_send_msg(post, reply, sizeof(reply), SINGLE_LOG_URL, "file");
+
+	cJSON_Delete(object);
+	free(post);
+
+	/* 发送防御日志 */
+	if (terminate >= MY_HANDLE_BLOCK_OK) {
+		defmsg.event_tv.tv_sec = msg->start_tv.tv_sec;
+		defmsg.event_tv.tv_usec = msg->start_tv.tv_usec;
+		defmsg.operation = termstr;
+		defmsg.result = defence_result;
+		defmsg.user = msg->username;
+		defmsg.log_name = "ContainerEscapeMisConfig";
+		defmsg.log_id = uuid;
+		defmsg.object = msg->cmdname;
+		send_defence_msg(&defmsg, "process");
+	}
+
+}
+
 #if 0
 static void send_file_msg(filereq_t *rep, struct file_msg_args *msg)
 #else
@@ -1157,7 +1339,7 @@ static void send_file_msg(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 
 	/* 匹配非法脚本 */
 	if (rep->type == F_ILLEGAL_SCRIPT &&
-		check_illegal_script(rep, msg, keyword) == 0) {
+		check_illegal_script_after(rep, msg, keyword) == 0) {
 		return;
 	}
 
@@ -1536,7 +1718,6 @@ static void black_after_post_data(filereq_t *rep, struct file_msg_args *msg)
 static void black_after_post_data(struct ebpf_filereq_t *rep, struct file_msg_args *msg)
 #endif
 {
-	printf("debug aaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
 	cJSON *object = NULL, *arguments = NULL;
 	char uuid[S_UUIDLEN] = {0}, reply[REPLY_MAX] = {0}, *post = NULL;
 	unsigned long event_time = 0;
@@ -2242,11 +2423,73 @@ int check_black_file_after(struct ebpf_filereq_t* req) {
 
 	ret = get_match_fblack_after_result(req);
 
-	if(ret < 0) {
-		return 0;
-	}
+	// if(ret < 0) {
+	// 	return 0;
+	// }
 
-	return 0;
+	return ret;
+}
+
+int check_container_escape(struct ebpf_filereq_t* req) {
+
+	int is_container = 1;
+	int ret;
+	int file_inode;
+	struct stat file_stat;
+	char container_prefix[128] = {0};
+
+	if (strncmp(req->nodename, "docker", 6)!=0 ){
+		// printf("The file is from HOST\n");
+		return -1;
+	}
+	else {
+		ret = stat(req->filename, &file_stat);  
+		if (ret < 0) {
+			printf("File is in Container...\n");
+			is_container = 1;
+		} 
+		else {
+			file_inode = file_stat.st_ino;
+			printf("stat file_inode is %d, ebpf file_inode is %ld\n", file_inode, req->i_ino);
+			if (file_inode == req->i_ino){
+				is_container = 0;
+			}
+			else {
+				is_container = 1;
+			}
+		}
+
+		if (is_container == 1) {
+			// printf("The file is from Container!\nNodename is %s\n", file_data->nodename);
+			struct bpf_object *file_program_obj = NULL;
+			file_program_obj = get_bpf_object(EBPF_FILE_OBJ);
+			if (!file_program_obj) {
+				printf("can't find the ebpf file program\n");
+				return -1;
+			}
+			struct bpf_map *file_map = bpf_object__find_map_by_name(file_program_obj, "container_prefix_map");
+			int file_map_fd = bpf_map__fd(file_map);
+			memset(container_prefix, 0, sizeof(container_prefix));
+			ret = bpf_map_lookup_elem(file_map_fd, req->nodename, container_prefix);
+			if (ret!=0) {
+				printf("No prefix value been found...\n");
+				return -1;
+			}
+			printf("prefix is %s\nfilename is %s\n", container_prefix, req->filename);
+			strncat(container_prefix, req->filename, sizeof(container_prefix)-strlen(container_prefix)-1);
+			// container_prefix[sizeof(container_prefix)-1] = 0;
+			strncpy(req->filename, container_prefix, sizeof(req->filename)-1);
+			req->filename[sizeof(req->filename)-1] = 0;
+			strncpy(req->new_filename, req->filename, sizeof(req->new_filename)-1);
+			req->new_filename[sizeof(req->new_filename)-1] = 0;
+			printf("Last Filename is %s\n", container_prefix);
+			return 0;
+		}
+		else {
+			printf("Original Filename is %s\n", req->filename);
+			return -1;
+		}
+	}
 }
 
 void *file_monitor(void *ptr)
@@ -2272,7 +2515,7 @@ void *file_monitor(void *ptr)
 
 	prctl(PR_SET_NAME, "file_monitor");
 	save_thread_pid("file", SNIPER_THREAD_FILEMON);
-
+	printf("file monitor start!!!!!!!!!!!!!!!!!1\n");
 //	backup_size = check_dir_size(TRASH_DIR);
 	while (Online) {
 		if (kfile_msg) {
@@ -2339,6 +2582,7 @@ void *file_monitor(void *ptr)
 		if (strcmp(rep->comm, "sniper_chk") == 0 ||
 			strcmp(rep->comm, "assist_sniper_chk") == 0 ||
 			strcmp(rep->comm, "webshell_detector") == 0 ||
+			strcmp(rep->comm, "log_send") == 0 ||
 			strcmp(rep->comm, "file_monitor") == 0 ) {
 			continue;
 		}
@@ -2349,12 +2593,17 @@ void *file_monitor(void *ptr)
 			}
 		}
 
-		// if (!strstr(rep->filename, "black")) {
-			// printf("filename(%s) is not include test\n", rep->filename);
+		// if (!strstr(rep->filename, "tmp.txt")) {
 		// 	continue;
 		// }
 
 		printf("=========================\n");
+		printf("Filename is %s, type is %d\n", rep->filename, rep->type);
+
+		// if (check_container_escape(rep)==0) {
+		// 	rep->type = F_CONTAINER_ESCAPE;
+		// 	printf("detect a Container Escape, comm is %s, filename is %s\n", rep->comm, rep->filename);
+		// }
 
 		if (check_black_file_after(rep)==0) {
 			rep->type = F_BLACK_AFTER;
@@ -2365,6 +2614,10 @@ void *file_monitor(void *ptr)
 			rep->type = F_SAFE;
 			printf("detect a forbidden file operation, comm is %s, filename is %s\n", rep->comm, rep->filename);
 		}
+		if (check_illegal_script(rep)==0) {
+			rep->type = F_ILLEGAL_SCRIPT;
+			printf("detect a illegal script file operation, comm is %s, filename is %s\n", rep->comm, rep->filename);
+		}
 
 		check_middle_targetcomm(rep);
 		
@@ -2374,8 +2627,8 @@ void *file_monitor(void *ptr)
 		}
 
 
-		DBG2(DBGFLAG_FILEDEBUG, "file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d\n", 
-			rep->pid, &(rep->args), &(rep->args) + rep->pro_len + 1, rep->type,rep->op_type,rep->uid);
+		// DBG2(DBGFLAG_FILEDEBUG, "file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d\n", 
+		// 	rep->pid, &(rep->args), &(rep->args) + rep->pro_len + 1, rep->type,rep->op_type,rep->uid);
 		printf("file msg pid:%d, process:%s, path:%s, rep->type:%d,rep->op_type:%d,rep->uid:%d, rep->path_len:%d, rep->proctime:%lu\n", 
 			rep->pid, rep->comm, rep->filename, rep->type, rep->op_type, rep->uid, rep->path_len, rep->proctime);
 		memset(&msg, 0, sizeof(struct file_msg_args));
@@ -2509,7 +2762,10 @@ void *file_monitor(void *ptr)
 			if (strstr(msg.pathname_new, TRAP_FILE_NOHIDE) != NULL) {
 				create_file(msg.pathname_new);
 			}
-		} else {
+		} else if (rep->type == F_CONTAINER_ESCAPE) {
+			send_container_escape_misconfig_file_msg(rep, &msg);
+		}
+		else {
 			send_file_msg(rep, &msg);
 		}
 

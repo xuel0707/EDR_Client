@@ -2165,6 +2165,7 @@ static void init_taskstat_common(struct ebpf_taskreq_t *req, taskstat_t *tasksta
 		taskstat->cmdlen = rpathlen;
 		taskstat->cmd[rpathlen] = 0;
 	} else {
+		printf("Start Get taskstat cmd... cmd(%d) is %s\n", req->cmdlen, cmd);
 		memcpy(taskstat->cmd, cmd, req->cmdlen);
 		taskstat->cmdlen = req->cmdlen;
 		taskstat->cmd[req->cmdlen] = 0;
@@ -2196,6 +2197,7 @@ static void init_taskstat_common(struct ebpf_taskreq_t *req, taskstat_t *tasksta
 			strncat(taskstat->args, " ", 1);
 		strncat(taskstat->args, req->args[i], 32);
 	}
+	taskstat->args[S_ARGSLEN-1] = 0;
 	taskstat->argslen = strlen(taskstat->args);
 	// printf("taskstat->args(%d): %s\n", taskstat->argslen, taskstat->args);
 #endif
@@ -2234,7 +2236,8 @@ static void init_taskstat_common(struct ebpf_taskreq_t *req, taskstat_t *tasksta
 		//TODO 如果把webshell、反弹shell看成有tty的操作，如何设session_uuid
 		get_session_uuid(taskstat->tty, taskstat->session_uuid);
 	}
-
+	printf("req cmd is %s\nargs is %s\ncwd is %s\n", req->cmd, req->args, req->cwd);
+	printf("taskstat cmd is %s\nargs is %s\ncwd is %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
 #if 0
 	if (req->ip[0] != 0) {
 		snprintf(taskstat->ip, sizeof(taskstat->ip), "%s", req->ip);
@@ -2318,7 +2321,6 @@ static taskstat_t *set_taskstat_exec(struct ebpf_taskreq_t *req)
 {
 	taskstat_t *taskstat = NULL;
 	pid_t pid = 0;
-
 	if (!req) {
 		MON_ERROR("set_taskstat_exec fail, NULL rep\n");
 		return NULL;
@@ -3513,7 +3515,7 @@ static void report_black(taskstat_t *taskstat)
 /* 检测当前进程命中的事件，及根据当前最新策略进行处理。目前只针对端口转发、反弹shell、黑名单 */
 static void check_process_event(void)
 {
-	printf("One Minute Pass!!! Let's check process events.....\n");
+	printf("One Minute Pass!!! Let's check process events.....\nremote execute_on is %d\n", prule.remote_execute_on);
 	
 	int ret = 0;
 	DIR *procdirp = NULL;
@@ -3623,6 +3625,7 @@ static void check_process_event(void)
 			continue;
 		}
 
+		printf("reverse shell turn on...%d\n", prule.remote_execute_on);
 		if (prule.remote_execute_on) {
 			if (taskstat->flags & TASK_REMOTE_EXECUTE) {
 				/* 不阻断反弹shell的话，不重复报警 */
@@ -3642,20 +3645,20 @@ static void check_process_event(void)
 				continue;
 			}
 
-			ret = is_remoteshell(taskstat);
-			if (ret > 0) {
-				if (is_filter_cmd(taskstat)) {
-					continue;
-				}
+			// ret = is_remoteshell(taskstat);
+			// if (ret > 0) {
+			// 	if (is_filter_cmd(taskstat)) {
+			// 		continue;
+			// 	}
 
-				if (ret == 3) {
-					taskstat->flags |= TASK_MAY_REMOTE_EXECUTE;
-				} else {
-					taskstat->flags |= TASK_REMOTE_EXECUTE;
-					report_remoteshell(taskstat);
-				}
-				continue;
-			}
+			// 	if (ret == 3) {
+			// 		taskstat->flags |= TASK_MAY_REMOTE_EXECUTE;
+			// 	} else {
+			// 		taskstat->flags |= TASK_REMOTE_EXECUTE;
+			// 		report_remoteshell(taskstat);
+			// 	}
+			// 	continue;
+			// }
 		}
 
 		if (prule.port_forward_on) {
@@ -3771,6 +3774,35 @@ static int is_printer_cmd(char *cmd)
 	return 0;
 }
 
+
+int skip_current(struct ebpf_taskreq_t *req) {
+
+	/* prelink会做很多ld-linux-x86-64.so.2 */
+	if (strcmp(req->cmd, "/lib64/ld-linux-x86-64.so.2") == 0) {
+		return 0;
+	}
+
+	/* 忽略定时任务sniper_chk,assist_sniper_chk及子任务 */
+	if (strncmp(req->comm, "sniper_chk", 16) == 0 ||
+	    strncmp(req->comm, "assist_sniper_chk", 16) == 0 ||
+	    strncmp(req->comm, "webshell_detector", 16) == 0 ) {
+		return 0;
+	}
+
+
+	for (int i=0;i<8;i++) {
+		if (req->pinfo.task[i].uid == 0)
+			break;
+		if (strncmp(req->pinfo.task[i].comm, "sniper_chk", 16) == 0 ||
+			strncmp(req->pinfo.task[i].comm, "assist_sniper_chk", 16) == 0) {
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
+
 /*
  * process exec monitor thread
  */
@@ -3800,6 +3832,7 @@ void *process_monitor(void *ptr)
 
 	while (Online) {
 		if (exec_msg) {
+			printf("Starting free req data, datalen is %d\n", exec_msg->datalen);
 			sniper_free(exec_msg->data, exec_msg->datalen, PROCESS_GET);
 			sniper_free(exec_msg, sizeof(struct kexec_msg), PROCESS_GET);
 		}
@@ -3838,9 +3871,9 @@ void *process_monitor(void *ptr)
 		/* 如果功能关闭，什么也不做 */
 		if (!prule.process_engine_on) {
 			if (last_process_check_status) {
-                        	INFO("Turn process engine off\n");
+                INFO("Turn process engine off\n");
 				fini_psbuf(1);
-                        	last_process_check_status = 0;
+                last_process_check_status = 0;
 			}
 			sleep(1);
 			continue;
@@ -3896,17 +3929,8 @@ void *process_monitor(void *ptr)
 
 		printf("[Sniper] Process:%s(%d) uid(%d), tgid(%d), filename is %s\n", req->cwd, req->pid, req->uid, req->tgid, req->cmd);
 
-		/* 忽略定时任务sniper_chk,assist_sniper_chk及子任务 */
-		if (strcmp(req->comm, "sniper_chk") == 0 ||
-			strcmp(req->comm, "assist_sniper_chk") == 0 ||
-			strcmp(req->comm, "webshell_detector") == 0 ) {
+		if (skip_current(req)==0) {
 			continue;
-		}
-		for (int i=0;i<4;i++) {
-			if (strcmp(req->pinfo.task[i].comm, "sniper_chk") == 0 ||
-				strcmp(req->pinfo.task[i].comm, "assist_sniper_chk") == 0) {
-				continue;
-			}
 		}
 #if 0
 		// ppid = req->pinfo.task[0].pid;
@@ -4068,19 +4092,48 @@ void *process_monitor(void *ptr)
 #else
 		if (is_port_forward(taskstat, 0)) {
 			taskstat->flags |= TASK_PORT_FORWARD;
+			printf("[process]port forward operation detect %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
 		}
-
-		if (is_danger_cmd(taskstat->args)) {
+		if (is_danger_cmd(taskstat)) {
 			taskstat->flags |= TASK_DANGER;
-			printf("danger taskstat %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
+			printf("[process]danger operation detect %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
 		}
 		if (is_chopper_cmd(taskstat->args)) {
 			taskstat->flags |= TASK_WEBSHELL;
-			printf("chopper taskstat %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
+			printf("[process]chopper operation detect %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
 		}
-		// if (is_abnormal(taskstat)) {
-		// 	taskstat->flags |= TASK_ABNORMAL;
+		if (is_miner_cmd(taskstat->args)) {
+			taskstat->flags |= TASK_MINER;
+			printf("[process]miner operation detect %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
+		}
+		if (is_abnormal(taskstat)) {
+			taskstat->flags |= TASK_ABNORMAL;
+			printf("process]abnormal operation detect %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
+		}
+		if (is_black_cmd(taskstat)) {
+			taskstat->flags |= TASK_BLACK;
+			printf("[process]black operation detect %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
+		}
+		if (is_filter_cmd(taskstat)) {
+			taskstat->flags |= TASK_DROP;
+			printf("[process]filter operation detect %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
+			continue;;
+		}
+		// ret = is_remoteshell(taskstat);
+		// if (ret > 0) {
+		// 	if (ret == 3) {
+		// 		INFO("%s may remote shell\n", taskstat->args);
+		// 		printf("[process]maybe remote shell operation detect %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
+		// 		taskstat->flags |= TASK_MAY_REMOTE_EXECUTE;
+		// 	} else {
+		// 		INFO("%s remote shell type %d\n", taskstat->args, ret);
+		// 		printf("[process]remote shell operation detect %s: %s\ncwd: %s\n", taskstat->cmd, taskstat->args, taskstat->cwd);
+		// 		taskstat->flags |= TASK_REMOTE_EXECUTE;
+		// 	}
 		// }
+
+		check_privup_exec(taskstat);
+
 		/* 异常的shell：带终端、存在的、属主是不可登录的用户 */
 		if (prule.abnormal_on && taskstat->pflags.shell && taskstat->tty[0] &&
 		    taskstat->stop_tv.tv_sec == 0 && !(taskstat->flags & TASK_REMOTE_EXECUTE)) {
@@ -4100,14 +4153,12 @@ void *process_monitor(void *ptr)
 			}
 		}
 #endif
-		set_taskstat_flags(taskstat, the_ptaskstat(taskstat));
-
-		check_privup_exec(taskstat);
-
+		// set_taskstat_flags(taskstat, the_ptaskstat(taskstat));
 #if 0
 		//TODO 先过滤。check_privup_exec合并到report_process里？
 		report_process(taskstat, 0, req->trust_events);
 #else
+		// continue;
 		report_process(taskstat, 0, 0);
 #endif
 

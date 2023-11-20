@@ -223,7 +223,6 @@ int http_post(char *api_str, char *post, char *reply, int reply_len)
 
 	if (http_post_data(url, post, reply, reply_len) < 0) {
 		DBG2(DBGFLAG_POST, "post %s to %s fail. reply %s\n", post, url, reply);
-		snprintf(reply, reply_len, "http post error");
 		return -1;
 	}
 

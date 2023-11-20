@@ -112,6 +112,71 @@ void print_droped_file_msgs(void)
 		last_report_droprepeat_time = now;
 	}
 }
+
+/* Get the complete filename and Check if  */
+static int get_entire_filename(struct ebpf_filereq_t* req) {
+
+	int is_container = 0;
+	int ret;
+	int file_inode;
+	struct stat file_stat = {};
+	char container_prefix[128] = {0};
+
+	if (strncmp(req->nodename, "docker", 6)!=0 ){
+		// printf("The file is from HOST\n");
+		return -1;
+	}
+	else {
+		ret = stat(req->filename, &file_stat);  
+		if (ret < 0) {
+			printf("File is in Container...\n");
+			is_container = 1;
+		} 
+		else {
+			file_inode = file_stat.st_ino;
+			printf("stat file_inode is %d, ebpf file_inode is %ld\n", file_inode, req->i_ino);
+			if (file_inode == req->i_ino){
+				is_container = 0;
+			}
+			else {
+				is_container = 1;
+			}
+		}
+
+		if (is_container == 1) {
+			// printf("The file is from Container!\nNodename is %s\n", file_data->nodename);
+			struct bpf_object *file_program_obj = NULL;
+			file_program_obj = get_bpf_object(EBPF_FILE_OBJ);
+			if (!file_program_obj) {
+				printf("can't find the ebpf file program\n");
+				return -1;
+			}
+			struct bpf_map *file_map = bpf_object__find_map_by_name(file_program_obj, "container_prefix_map");
+			int file_map_fd = bpf_map__fd(file_map);
+			memset(container_prefix, 0, sizeof(container_prefix));
+			ret = bpf_map_lookup_elem(file_map_fd, req->nodename, container_prefix);
+			if (ret!=0) {
+				printf("No prefix value been found...\n");
+				return -1;
+			}
+			printf("prefix is %s\nfilename is %s\n", container_prefix, req->filename);
+			strncat(container_prefix, req->filename, sizeof(container_prefix)-strlen(container_prefix)-1);
+			// container_prefix[sizeof(container_prefix)-1] = 0;
+			strncpy(req->filename, container_prefix, sizeof(req->filename)-1);
+			req->filename[sizeof(req->filename)-1] = 0;
+			strncpy(req->new_filename, req->filename, sizeof(req->new_filename)-1);
+			req->new_filename[sizeof(req->new_filename)-1] = 0;
+			printf("Complete Filename is %s\n", container_prefix);
+			return 0;
+		}
+		else {
+			req->type = F_CONTAINER_ESCAPE;
+			printf("Check container Escape, Filename is %s\n", req->filename);
+			return -1;
+		}
+	}
+}
+
 #if 0
 static kfile_msg_t *req2msg(filereq_t *req)
 {
@@ -163,6 +228,7 @@ static kfile_msg_t *req2msg(struct ebpf_filereq_t *req)
 	}
 
 	memcpy(msg->data, req, msg->datalen);
+	get_entire_filename((struct ebpf_filereq_t *)msg->data);
 
 	return msg;
 }

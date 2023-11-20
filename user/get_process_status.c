@@ -1418,14 +1418,21 @@ static int is_rm_sysdir(char *cmd, char *dir)
  * dd的目标对象为盘，如dd if=/dev/null of=/dev/sda
  * mv参数包含/dev/null
  */
-int is_danger_cmd(char *cmd)
+int is_danger_cmd(taskstat_t *taskstat)
 {
+	int enable = protect_policy_global.process.risk_command.enable;
+	if (enable==0)
+		return 0;
 	char *firstblank = NULL;
 	char *ptr = NULL, *devstr = NULL;
+	char *cmd = taskstat->args;
 	struct stat st = {0};
 	int len = 0;
 	char devname[128] = {0};
 
+	if (taskstat->argc==1) {
+		return 1;
+	}
 	if (!cmd) {
 		return 0;
 	}
@@ -1492,6 +1499,21 @@ int is_chopper_cmd(char *cmd)
 	return 0;
 }
 
+int is_miner_cmd(char *cmd) {
+	int enable = protect_policy_global.behaviour.pool.enable;
+	if (enable==0) {
+		return 0;
+	}
+	if (strcmp(cmd,"./badping")==0) {
+		return 1;
+	}
+	if (!strstr(cmd, "stratum+tcp://")) {
+		return 0;
+	}
+	
+	return 1;
+}
+
 /* 检测是否危险命令。返回0，正常；1，危险 */
 int is_danger(taskstat_t *taskstat)
 {
@@ -1519,6 +1541,7 @@ static int in_unexec_dirs(char *cmd, char *cwd)
 	//TODO 1、把cwd和cmd拼接起来。2、检查cmd的目录是否任意人可读写
 	if (cmd[0] == '/') {
 		if (strncmp(cmd, "/tmp/", 5) == 0 ||
+			strncmp(cmd, "/dev/shm/", 9) == 0 ||
 			strncmp(cmd, "/var/log/", 9) == 0 ||
 			strncmp(cmd, "/var/tmp/", 9) == 0) {
 				return 1;
@@ -1526,6 +1549,7 @@ static int in_unexec_dirs(char *cmd, char *cwd)
 	}
 	//  else {
 		if (is_dir(cwd, "/tmp", 4) ||
+			is_dir(cwd, "/dev/shm", 8) ||
 			is_dir(cwd, "/var/log", 8) ||
 			is_dir(cwd, "/var/tmp", 8)) {
 				return 1;
@@ -1538,6 +1562,9 @@ static int in_unexec_dirs(char *cmd, char *cwd)
 /* 检测是否异常命令。返回0，正常；1，异常 */
 int is_abnormal(taskstat_t *taskstat)
 {
+	int enable = protect_policy_global.process.abnormal_process.enable;
+	if (enable == 0)
+		return 0;
 #if 0
 	if (!prule.abnormal_on || !taskstat || taskstat->flags & TASK_DOCKER) {
 		return 0;

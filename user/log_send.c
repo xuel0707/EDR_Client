@@ -143,6 +143,7 @@ int client_send_msg(char *post, char *reply, int reply_len, char *url, char *log
 	/* 剩下的都是需要即使通信的, 失败再存入本地 */
 	if (http_post(url, post, reply, reply_len) <= 0) {
 		printf("send msg to %s fail\n", url);
+		// printf("reply(%d) is %s\n", reply_len, reply);
 		if (client_registered && !Heartbeat_fail) { //已知与管控通信异常时不打印
 			MON_ERROR("send msg to %s fail\n", url);
 		}

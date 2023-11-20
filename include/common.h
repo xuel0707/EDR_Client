@@ -230,6 +230,11 @@
 #define RULE_FLAG_PARAM_EXCLUDE 0x4
 #define RULE_FLAG_UID           0x8
 
+struct timeval2 {
+	long tv_sec;    
+	long tv_usec;    
+};
+
 /* sniper程序的inode号和所在的磁盘设备号 */
 struct sniper_inode {
 	unsigned int major;
@@ -363,7 +368,7 @@ struct ebpf_task_simple_info {
 
 
 struct ebpf_parent_info {
-	struct ebpf_task_simple_info task[4];
+	struct ebpf_task_simple_info task[SNIPER_PGEN];
 };
 
 struct ebpf_taskreq_t {
@@ -386,7 +391,7 @@ struct ebpf_taskreq_t {
 	struct file *exe_file;       // ???
 	char comm[16];
 	char tty[S_TTYLEN];
-	char nodename[S_NAMELEN+1];
+	char nodename[32];
 	char cmd[S_CMDLEN];
 	char cwd[S_CWDLEN];
 	char args[8][32];           // Used to store the arguments, max 8.
@@ -430,39 +435,19 @@ struct ebpf_taskreq_t {
 #define F_ABNORMAL              16
 #define F_USB                   17
 #define F_VIRUS                 18
+#define F_APT                   19
+#define F_CONTAINER_ESCAPE      20
 
 #define NET_MPORT_SCAN          0x01
 #define NET_MHONEY_PORT         0x02
 #define NET_MODULE_ALL          0x03
 
-extern char sniper_fileop[MAX_SNIPER_FILEOP][S_NAMELEN];
+#define NET_TCP_CONNECT_BASH 	0x04
+#define NET_ILLEGAL_CONNECT     0x05       		
+#define TASK_COMM_LEN 			16
+#define MAX_FILENAME_LEN 		512
 
-struct file_request {
-	uid_t uid;
-	pid_t pid;
-	int did_exec;
-	struct ebpf_parent_info pinfo;
-	unsigned long proctime;
-	struct timeval event_tv;
-	unsigned short op_type;  //1:open 2:close 3:unlink 4:rename 5:symlink
-	unsigned short type;     //1:sensitive 2:log_delete 3:safe 4:logcollector
-	unsigned short size;     //request size: head + args
-	char parent_comm[S_COMMLEN];
-	char md5[S_MD5LEN];
-	char tty[S_TTYLEN];
-	unsigned short path_len;
-	unsigned short pro_len;
-	unsigned short newpath_len;
-	loff_t file_size;
-	loff_t newfile_size;
-	unsigned int peerip;
-	int terminate;
-	int is_trust;
-	long mtime_sec;
-	long mtime_nsec;
-	char args;
-};
-typedef struct file_request filereq_t;
+extern char sniper_fileop[MAX_SNIPER_FILEOP][S_NAMELEN];
 
 struct ebpf_filereq_t {
 	uid_t uid;       // The user id.
@@ -485,16 +470,17 @@ struct ebpf_filereq_t {
 	long mtime_nsec;             // The mtime of the filem unit is nanosecond.
 	long long int file_size;
 	long long int newfile_size;
-	struct parent_info pinfo;    // The parent processes information (Up to 4 generations).
-	char filename[64];
+	struct ebpf_parent_info pinfo;    // The parent processes information (Up to 4 generations).
+	long unsigned int i_ino;
+	char filename[128];
 	unsigned int path_len;
-	char new_filename[64];
+	char new_filename[128];
 	unsigned int newpath_len;
 	char pro_pathname[64];
 	unsigned int pro_len;
 	int terminate;               // Been Abandoned, used to Judge whether the Block is needed.
 	char tty[S_TTYLEN];
-	char nodename[S_NAMELEN+1];
+	char nodename[32];
 	// char cmd[S_CMDLEN];
 	// char cwd[S_CWDLEN];
 	char args[8][64];            // Used to store the arguments.
@@ -548,7 +534,8 @@ struct net_flags {
 			      icmp : 1,
 
 			    lockip : 1, //发锁ip消息时使用
-			  unlockip : 1; //发解锁ip消息时使用
+			  unlockip : 1, //发解锁ip消息时使用
+			dockersock : 1;
 };
 struct net_request {
 	uid_t uid;
@@ -580,6 +567,7 @@ struct net_request {
 };
 typedef struct net_request netreq_t;
 
+#if 0
 struct ebpf_netreq_t {
 	unsigned char comm[16];
 	unsigned short sport; // __u16
@@ -588,6 +576,83 @@ struct ebpf_netreq_t {
 	unsigned int daddr;   // __be32
 	unsigned int pid;     // __u32
 	unsigned char  containerid[32];
+};
+#else
+struct ebpf_netreq_t {
+	unsigned int uid; 
+	unsigned int gid;                        	
+	unsigned int pid;
+	unsigned int tgid;
+	unsigned int net_type;   
+	char comm[16]; 
+	char parent_comm[16]; 
+	unsigned int parent_pid;
+	unsigned char protocol; 
+	unsigned short res1: 4;
+	unsigned short doff: 4;
+	unsigned short fin: 1;
+	unsigned short syn: 1;
+	unsigned short rst: 1;
+	unsigned short psh: 1;
+	unsigned short ack: 1;
+	unsigned short urg: 1;
+	unsigned short ece: 1;
+	unsigned short cwr: 1;                
+	unsigned short dport;                       
+	unsigned short sport;  
+	unsigned int daddr;                      
+	unsigned int saddr;
+	unsigned int sessionid;
+	unsigned long start_time;
+	char pathname[64];
+	char parent_pathname[64];   
+	struct ebpf_parent_info pinfo;     
+	unsigned long exeino;               
+	unsigned long proctime;             
+	struct timeval2 event_tv; 
+	unsigned short type;          
+    
+	unsigned int repeat;                
+	int domain_query_type;              
+	unsigned int effective_time;        
+	unsigned int portscan_lockip_time;  
+	unsigned int portscan_max;         
+	unsigned int honey_lockip_time;    
+	unsigned int ports_count;           
+	unsigned short reason;             
+	char ip[S_IPLEN];                   
+	char domain[S_DOMAIN_NAMELEN];      
+};
+#endif
+
+struct sock_event {
+	unsigned int uid; 
+	unsigned int gid;                        	
+	unsigned int pid;
+	unsigned int tgid;
+	unsigned int net_type;   
+	char comm[16]; 
+	char parent_comm[16]; 
+	unsigned int parent_pid;
+	unsigned char protocol; 
+	unsigned short res1: 4;
+	unsigned short doff: 4;
+	unsigned short fin: 1;
+	unsigned short syn: 1;
+	unsigned short rst: 1;
+	unsigned short psh: 1;
+	unsigned short ack: 1;
+	unsigned short urg: 1;
+	unsigned short ece: 1;
+	unsigned short cwr: 1;             
+	unsigned short dport;                       
+	unsigned short sport;  
+	unsigned int daddr;                      
+	unsigned int saddr;
+	unsigned int sessionid;
+	unsigned long start_time;
+	char pathname[64];
+	char parent_pathname[64];                         
 };
 
 struct port_scan {

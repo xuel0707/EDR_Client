@@ -88,7 +88,7 @@
 #define PROCESS_FIREWALL_CHANGE				1020 //非法修改防火墙规则
 #define PROCESS_FAKE_SYSPROCESS				1021 //伪造系统进程
 
-#define NET_ILLEGAL_CONNECTION				4003	
+#define NET_ILLEGAL_CONNECTION				4003
 
 /*login*/
 #define LOGIN_LOCAL_USER				2000

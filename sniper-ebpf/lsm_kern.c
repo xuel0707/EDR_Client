@@ -49,8 +49,6 @@ int trace_enter_execve(struct sys_enter_execve_args *ctx) {
 	get_base_info_taskreq(req);
 	/* Get the parent process info and skip sniper sub-processes*/
 	skip_current(&(req->pinfo));
-	// set ppid
-	req->ppid = req->pinfo.task[0].pid;
 
 	/* Get cmd (executable filename of current process) */
 	req->cmdlen = bpf_probe_read_str(req->cmd, sizeof(req->cmd), ctx->filename);
@@ -68,7 +66,7 @@ int trace_enter_execve(struct sys_enter_execve_args *ctx) {
 
 	/* Get mnt_id and nodename */
 	req->mnt_id = get_mnt_id();
-	bpf_probe_read_str(req->nodename, sizeof(req->nodename), get_uts_name());
+	bpf_probe_read_str(req->nodename, sizeof(req->nodename), current->cgroups->subsys[0]->cgroup->kn->name);
 	bpf_printk("Mount namespace id: %u, nodename: %s", req->mnt_id, req->nodename);
 
 	/* Get tty */
